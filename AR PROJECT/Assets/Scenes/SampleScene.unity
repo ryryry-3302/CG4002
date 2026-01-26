@@ -420,8 +420,8 @@ GameObject:
   m_Component:
   - component: {fileID: 694946835}
   - component: {fileID: 694946834}
-  - component: {fileID: 694946833}
-  - component: {fileID: 694946832}
+  - component: {fileID: 694946837}
+  - component: {fileID: 694946836}
   m_Layer: 0
   m_Name: XR Origin
   m_TagString: Untagged
@@ -429,35 +429,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &694946832
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 694946831}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ea00b56f63c1284f68a3a1ae87978787, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  orchestraPrefab: {fileID: 3015908556166582761, guid: d4d47e991f8ef9b5ab692681a771fbdf, type: 3}
-  prefabOffset: {x: 0, y: -0.1, z: 0}
---- !u!114 &694946833
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 694946831}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4dea56a9eaadd1c439095de4f9a371cb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_SerializedLibrary: {fileID: 11400000, guid: ebd462279c8ef84fbbe59906e2cc0832, type: 2}
-  m_MaxNumberOfMovingImages: 1
-  m_TrackedImagePrefab: {fileID: 0}
 --- !u!114 &694946834
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -491,6 +462,37 @@ Transform:
   - {fileID: 1012530465}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &694946836
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 694946831}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81785b937f39739bead6d67185345981, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  imageLibrary: {fileID: 11400000, guid: ebd462279c8ef84fbbe59906e2cc0832, type: 2}
+  prefabs:
+  - {fileID: 6903682532646495808, guid: 9274e95e1b1f8325498c82c025529f13, type: 3}
+  - {fileID: 3015908556166582761, guid: d4d47e991f8ef9b5ab692681a771fbdf, type: 3}
+--- !u!114 &694946837
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 694946831}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4dea56a9eaadd1c439095de4f9a371cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_SerializedLibrary: {fileID: 11400000, guid: ebd462279c8ef84fbbe59906e2cc0832, type: 2}
+  m_MaxNumberOfMovingImages: 2
+  m_TrackedImagePrefab: {fileID: 0}
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
