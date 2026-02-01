@@ -81,11 +81,19 @@ public class OrchestraPlacement : MonoBehaviour
         GameObject prefab = orchestraPrefabs[selectedIndex];
         if (prefab == null) return;
         
-        GameObject member = Instantiate(prefab, position, rotation);
-        member.transform.localScale = Vector3.one * prefabScale;
+        // Combine the hit rotation (surface alignment) with the prefab's inherent rotation
+        Quaternion finalRotation = rotation * prefab.transform.rotation;
+
+        // Calculate final position using the prefab's local scale for the offset to match the object's dimensions
+        Vector3 scaledOffset = Vector3.Scale(prefab.transform.localPosition, prefab.transform.localScale);
+        Vector3 finalPosition = position + (rotation * scaledOffset);
+        
+        GameObject member = Instantiate(prefab, finalPosition, finalRotation);
+        // Use the scale specified in the prefab instead of the script override
+        member.transform.localScale = prefab.transform.localScale;
         placedMembers.Add(member);
         
-        Debug.Log($"Placed {prefab.name} at {position}");
+        Debug.Log($"Placed {prefab.name} at {finalPosition}");
     }
 
     public void SelectNextMember()
