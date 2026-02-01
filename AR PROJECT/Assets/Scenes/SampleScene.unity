@@ -761,8 +761,10 @@ MonoBehaviour:
   raycastManager: {fileID: 694946837}
   planeManager: {fileID: 694946836}
   orchestraPrefabs:
-  - {fileID: 6903682532646495808, guid: 9274e95e1b1f8325498c82c025529f13, type: 3}
+  - {fileID: 2699246951506681812, guid: e8c3008f0c604b681bbc389d8f3a86ab, type: 3}
   - {fileID: 3015908556166582761, guid: d4d47e991f8ef9b5ab692681a771fbdf, type: 3}
+  - {fileID: 6903682532646495808, guid: 9274e95e1b1f8325498c82c025529f13, type: 3}
+  - {fileID: 5453517533626380693, guid: d3ae1a5e8bae5203b909d3dee4178b3a, type: 3}
   prefabScale: 0.5
 --- !u!4 &1141421496
 Transform:

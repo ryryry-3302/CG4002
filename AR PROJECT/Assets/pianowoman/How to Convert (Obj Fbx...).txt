@@ -1,0 +1,5 @@
+You can convert model format into .OBJ .GLB .FBX .DAE .3DS,..
+
+using this tool:
+
+https://rigmodels.com/convert3d
