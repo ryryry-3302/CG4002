@@ -14,13 +14,13 @@ public class ARDebugger : MonoBehaviour
     private bool showLog = false; // Start hidden, toggle with button
 
     // Magic method to run this without needing to add it to the scene manually
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void AutoStart()
-    {
-        GameObject go = new GameObject("AR Debugger Auto");
-        go.AddComponent<ARDebugger>();
-        DontDestroyOnLoad(go);
-    }
+    // [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    // static void AutoStart()
+    // {
+    //     GameObject go = new GameObject("AR Debugger Auto");
+    //     go.AddComponent<ARDebugger>();
+    //     DontDestroyOnLoad(go);
+    // }
 
     void Start()
     {
