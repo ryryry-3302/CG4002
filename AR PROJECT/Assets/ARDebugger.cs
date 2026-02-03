@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using System.Text;
+using OrchestraMaestro;
 
 public class ARDebugger : MonoBehaviour
 {
