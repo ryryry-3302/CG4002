@@ -1,0 +1,14 @@
+{
+    "cues": [
+        { "timestamp": 2.0, "gestureId": "DOWN", "section": "Drum" },
+        { "timestamp": 4.0, "gestureId": "UP", "section": "Drum" },
+        { "timestamp": 6.0, "gestureId": "PUNCH", "section": "Flute" },
+        { "timestamp": 8.0, "gestureId": "LEFT", "section": "" },
+        { "timestamp": 10.0, "gestureId": "DOWN", "section": "Pipe" },
+        { "timestamp": 12.0, "gestureId": "RIGHT", "section": "" },
+        { "timestamp": 14.0, "gestureId": "UP", "section": "Xylophone" },
+        { "timestamp": 16.0, "gestureId": "PUNCH", "section": "Xylophone" },
+        { "timestamp": 18.0, "gestureId": "DOWN", "section": "Drum" },
+        { "timestamp": 20.0, "gestureId": "WITHDRAW", "section": "Flute" }
+    ]
+}

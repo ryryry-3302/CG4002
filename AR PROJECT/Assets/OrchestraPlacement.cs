@@ -3,6 +3,9 @@ using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using System.Collections.Generic;
 
+namespace OrchestraMaestro
+{
+
 public class OrchestraPlacement : MonoBehaviour
 {
     [Header("AR Components")]
@@ -13,6 +16,18 @@ public class OrchestraPlacement : MonoBehaviour
     [Tooltip("Drag your orchestra member prefabs here")]
     [SerializeField] private GameObject[] orchestraPrefabs;
     
+    [Header("Section Assignment")]
+    [Tooltip("Which section each prefab belongs to (same order as prefabs)")]
+    [SerializeField] private OrchestraSection[] prefabSections;
+    
+    [Header("Visual Feedback")]
+    [SerializeField] private Color highlightColor = new Color(1f, 0.84f, 0f, 1f); // Gold
+    [SerializeField] private Color perfectColor = new Color(0f, 1f, 0.5f, 1f);   // Green
+    [SerializeField] private Color goodColor = new Color(1f, 1f, 0f, 1f);        // Yellow
+    [SerializeField] private Color missColor = new Color(1f, 0.3f, 0.3f, 1f);    // Red
+    [SerializeField] private float highlightIntensity = 2f;
+    [SerializeField] private float feedbackDuration = 0.5f;
+    
     [Header("Settings")]
     [SerializeField] private float prefabScale = 0.5f;
     
@@ -20,13 +35,40 @@ public class OrchestraPlacement : MonoBehaviour
     private List<GameObject> placedMembers = new List<GameObject>();
     private int selectedIndex = 0;
     private bool isPlacementMode = true;
+    
+    // Section grouping for conducting game
+    private List<GameObject>[] sectionMembers = new List<GameObject>[4];
+    private int currentHighlightedSection = -1;
+    private Dictionary<Renderer, Color> originalColors = new Dictionary<Renderer, Color>();
+    
+    // Singleton
+    public static OrchestraPlacement Instance { get; private set; }
 
     void Start()
     {
+        // Singleton setup
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        
+        // Initialize section lists
+        for (int i = 0; i < 4; i++)
+        {
+            sectionMembers[i] = new List<GameObject>();
+        }
+        
         if (raycastManager == null)
             raycastManager = FindObjectOfType<ARRaycastManager>();
         if (planeManager == null)
             planeManager = FindObjectOfType<ARPlaneManager>();
+    }
+    
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
     }
 
     void Update()
@@ -93,7 +135,42 @@ public class OrchestraPlacement : MonoBehaviour
         member.transform.localScale = prefab.transform.localScale;
         placedMembers.Add(member);
         
-        Debug.Log($"Placed {prefab.name} at {finalPosition}");
+        // Add to appropriate section
+        OrchestraSection section = GetSectionForPrefab(selectedIndex);
+        sectionMembers[(int)section].Add(member);
+        
+        // Store original colors for highlighting
+        CacheOriginalColors(member);
+        
+        Debug.Log($"Placed {prefab.name} at {finalPosition} in section {section}");
+    }
+    
+    /// <summary>Get the section assignment for a prefab index</summary>
+    private OrchestraSection GetSectionForPrefab(int prefabIndex)
+    {
+        if (prefabSections != null && prefabIndex < prefabSections.Length)
+        {
+            return prefabSections[prefabIndex];
+        }
+        // Default: distribute evenly across sections
+        return (OrchestraSection)(prefabIndex % 4);
+    }
+    
+    /// <summary>Cache original material colors for later restoration</summary>
+    private void CacheOriginalColors(GameObject member)
+    {
+        Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+        foreach (var renderer in renderers)
+        {
+            if (renderer.material.HasProperty("_Color"))
+            {
+                originalColors[renderer] = renderer.material.color;
+            }
+            else if (renderer.material.HasProperty("_BaseColor"))
+            {
+                originalColors[renderer] = renderer.material.GetColor("_BaseColor");
+            }
+        }
     }
 
     public void SelectNextMember()
@@ -153,6 +230,197 @@ public class OrchestraPlacement : MonoBehaviour
         planeManager.enabled = true;
     }
 
+    #region Section Highlighting & Feedback
+    
+    /// <summary>Highlight a specific orchestra section</summary>
+    public void HighlightSection(int sectionIndex)
+    {
+        // Remove highlight from previous section
+        if (currentHighlightedSection >= 0 && currentHighlightedSection != sectionIndex)
+        {
+            SetSectionHighlight(currentHighlightedSection, false);
+        }
+        
+        // Apply highlight to new section
+        if (sectionIndex >= 0 && sectionIndex < 4)
+        {
+            SetSectionHighlight(sectionIndex, true);
+            currentHighlightedSection = sectionIndex;
+        }
+    }
+    
+    /// <summary>Remove all section highlights</summary>
+    public void ClearHighlight()
+    {
+        if (currentHighlightedSection >= 0)
+        {
+            SetSectionHighlight(currentHighlightedSection, false);
+            currentHighlightedSection = -1;
+        }
+    }
+    
+    private void SetSectionHighlight(int sectionIndex, bool highlighted)
+    {
+        List<GameObject> members = sectionMembers[sectionIndex];
+        
+        foreach (var member in members)
+        {
+            if (member == null) continue;
+            
+            Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+            foreach (var renderer in renderers)
+            {
+                if (highlighted)
+                {
+                    // Apply highlight tint
+                    ApplyColorTint(renderer, highlightColor, highlightIntensity);
+                }
+                else
+                {
+                    // Restore original color
+                    RestoreOriginalColor(renderer);
+                }
+            }
+        }
+    }
+    
+    private void ApplyColorTint(Renderer renderer, Color tint, float intensity)
+    {
+        if (originalColors.TryGetValue(renderer, out Color original))
+        {
+            Color blended = Color.Lerp(original, tint, 0.4f) * intensity;
+            blended.a = original.a;
+            
+            if (renderer.material.HasProperty("_Color"))
+            {
+                renderer.material.color = blended;
+            }
+            else if (renderer.material.HasProperty("_BaseColor"))
+            {
+                renderer.material.SetColor("_BaseColor", blended);
+            }
+            
+            // Enable emission if available
+            if (renderer.material.HasProperty("_EmissionColor"))
+            {
+                renderer.material.EnableKeyword("_EMISSION");
+                renderer.material.SetColor("_EmissionColor", tint * (intensity - 1f));
+            }
+        }
+    }
+    
+    private void RestoreOriginalColor(Renderer renderer)
+    {
+        if (originalColors.TryGetValue(renderer, out Color original))
+        {
+            if (renderer.material.HasProperty("_Color"))
+            {
+                renderer.material.color = original;
+            }
+            else if (renderer.material.HasProperty("_BaseColor"))
+            {
+                renderer.material.SetColor("_BaseColor", original);
+            }
+            
+            // Disable emission
+            if (renderer.material.HasProperty("_EmissionColor"))
+            {
+                renderer.material.SetColor("_EmissionColor", Color.black);
+            }
+        }
+    }
+    
+    /// <summary>Trigger visual feedback for a hit/miss on a section</summary>
+    public void TriggerHitFeedback(int sectionIndex, JudgementType judgement)
+    {
+        if (sectionIndex < 0 || sectionIndex >= 4) return;
+        
+        Color feedbackColor = judgement switch
+        {
+            JudgementType.Perfect => perfectColor,
+            JudgementType.Good => goodColor,
+            JudgementType.Miss => missColor,
+            _ => Color.white
+        };
+        
+        StartCoroutine(HitFeedbackCoroutine(sectionIndex, feedbackColor));
+    }
+    
+    private System.Collections.IEnumerator HitFeedbackCoroutine(int sectionIndex, Color feedbackColor)
+    {
+        List<GameObject> members = sectionMembers[sectionIndex];
+        
+        // Flash the feedback color
+        foreach (var member in members)
+        {
+            if (member == null) continue;
+            
+            Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+            foreach (var renderer in renderers)
+            {
+                ApplyColorTint(renderer, feedbackColor, highlightIntensity * 1.5f);
+            }
+        }
+        
+        // Wait and fade back
+        float elapsed = 0f;
+        while (elapsed < feedbackDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / feedbackDuration;
+            float intensity = Mathf.Lerp(highlightIntensity * 1.5f, highlightIntensity, t);
+            
+            foreach (var member in members)
+            {
+                if (member == null) continue;
+                
+                Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+                foreach (var renderer in renderers)
+                {
+                    // Blend from feedback color back to highlight (if section is highlighted)
+                    Color targetColor = (sectionIndex == currentHighlightedSection) ? highlightColor : Color.white;
+                    Color blendedColor = Color.Lerp(feedbackColor, targetColor, t);
+                    ApplyColorTint(renderer, blendedColor, intensity);
+                }
+            }
+            
+            yield return null;
+        }
+        
+        // Restore to normal state
+        if (sectionIndex == currentHighlightedSection)
+        {
+            SetSectionHighlight(sectionIndex, true);
+        }
+        else
+        {
+            foreach (var member in members)
+            {
+                if (member == null) continue;
+                
+                Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+                foreach (var renderer in renderers)
+                {
+                    RestoreOriginalColor(renderer);
+                }
+            }
+        }
+    }
+    
+    /// <summary>Get members in a specific section</summary>
+    public List<GameObject> GetSectionMembers(OrchestraSection section)
+    {
+        return sectionMembers[(int)section];
+    }
+    
+    /// <summary>Get all placed members</summary>
+    public List<GameObject> GetAllMembers()
+    {
+        return new List<GameObject>(placedMembers);
+    }
+    
+    #endregion
+
     void OnGUI()
     {
         GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * 3);
@@ -209,3 +477,5 @@ public class OrchestraPlacement : MonoBehaviour
         GUILayout.EndArea();
     }
 }
+
+} // namespace OrchestraMaestro

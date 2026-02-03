@@ -1,0 +1,453 @@
+using System;
+using UnityEngine;
+
+namespace OrchestraMaestro
+{
+    /// <summary>
+    /// Main game controller for Orchestra Maestro conducting game.
+    /// Handles game state, section selection, gesture processing, and scoring.
+    /// </summary>
+    public class RhythmGameController : MonoBehaviour
+    {
+        [Header("References")]
+        [SerializeField] private RhythmMap rhythmMap;
+        [SerializeField] private AudioMixerController audioMixer;
+        [SerializeField] private OrchestraPlacement orchestraPlacement;
+        [SerializeField] private HUDController hudController;
+
+        [Header("Game Settings")]
+        [SerializeField] private bool autoStartTestMap = true;
+
+        [Header("Combo Validation")]
+        [SerializeField] private float comboStrokeWindow = 1.0f; // Time window for combo stick patterns
+
+        // Game State
+        public enum GameState { Setup, Playing, Paused, Results }
+        private GameState currentState = GameState.Setup;
+
+        // Section Selection (0-3, wraps around)
+        private int selectedSectionIndex = 0;
+        public OrchestraSection SelectedSection => (OrchestraSection)selectedSectionIndex;
+
+        // Scoring
+        private int totalScore = 0;
+        private int combo = 0;
+        private int maxCombo = 0;
+        private int perfectCount = 0;
+        private int goodCount = 0;
+        private int missCount = 0;
+
+        // Events
+        public event Action<GameState> OnGameStateChanged;
+        public event Action<OrchestraSection> OnSectionChanged;
+        public event Action<ScoringResult> OnGestureJudged;
+        public event Action<int, int> OnScoreChanged; // score, combo
+
+        // Singleton
+        public static RhythmGameController Instance { get; private set; }
+
+        // Public accessors
+        public GameState CurrentState => currentState;
+        public int TotalScore => totalScore;
+        public int Combo => combo;
+        public int MaxCombo => maxCombo;
+        public int PerfectCount => perfectCount;
+        public int GoodCount => goodCount;
+        public int MissCount => missCount;
+
+        #region Unity Lifecycle
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            Instance = this;
+        }
+
+        private void Start()
+        {
+            // Subscribe to MQTT events
+            if (MQTTManager.Instance != null)
+            {
+                MQTTManager.Instance.OnGestureReceived += HandleGestureReceived;
+                MQTTManager.Instance.OnDownstroke += HandleDownstroke;
+            }
+
+            // Subscribe to rhythm map events
+            if (rhythmMap != null)
+            {
+                rhythmMap.OnCueMissed += HandleCueMissed;
+            }
+
+            // Auto-start test map for development
+            if (autoStartTestMap)
+            {
+                Invoke(nameof(StartTestGame), 1f);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (MQTTManager.Instance != null)
+            {
+                MQTTManager.Instance.OnGestureReceived -= HandleGestureReceived;
+                MQTTManager.Instance.OnDownstroke -= HandleDownstroke;
+            }
+
+            if (rhythmMap != null)
+            {
+                rhythmMap.OnCueMissed -= HandleCueMissed;
+            }
+
+            if (Instance == this) Instance = null;
+        }
+
+        #endregion
+
+        #region Game Flow
+
+        /// <summary>Start a test game with the built-in test map</summary>
+        public void StartTestGame()
+        {
+            if (rhythmMap == null)
+            {
+                Debug.LogError("[RhythmGameController] RhythmMap reference not set!");
+                return;
+            }
+
+            rhythmMap.LoadTestMap();
+            StartGame();
+        }
+
+        /// <summary>Start the game with the currently loaded rhythm map</summary>
+        public void StartGame()
+        {
+            ResetScore();
+            selectedSectionIndex = 0;
+            
+            rhythmMap.StartPlayback();
+            SetGameState(GameState.Playing);
+
+            Debug.Log("[RhythmGameController] Game started!");
+        }
+
+        /// <summary>Pause the game</summary>
+        public void PauseGame()
+        {
+            if (currentState != GameState.Playing) return;
+
+            rhythmMap.PausePlayback();
+            SetGameState(GameState.Paused);
+        }
+
+        /// <summary>Resume from pause</summary>
+        public void ResumeGame()
+        {
+            if (currentState != GameState.Paused) return;
+
+            rhythmMap.StartPlayback();
+            SetGameState(GameState.Playing);
+        }
+
+        /// <summary>End the game and show results</summary>
+        public void EndGame()
+        {
+            rhythmMap.StopPlayback();
+            SetGameState(GameState.Results);
+
+            Debug.Log($"[RhythmGameController] Game ended! Score: {totalScore}, Max Combo: {maxCombo}");
+        }
+
+        private void SetGameState(GameState newState)
+        {
+            if (currentState == newState) return;
+
+            currentState = newState;
+            OnGameStateChanged?.Invoke(newState);
+
+            Debug.Log($"[RhythmGameController] State changed to: {newState}");
+        }
+
+        private void ResetScore()
+        {
+            totalScore = 0;
+            combo = 0;
+            maxCombo = 0;
+            perfectCount = 0;
+            goodCount = 0;
+            missCount = 0;
+
+            OnScoreChanged?.Invoke(totalScore, combo);
+        }
+
+        #endregion
+
+        #region Section Navigation
+
+        /// <summary>Move section selection left (wraps around)</summary>
+        public void SelectPreviousSection()
+        {
+            selectedSectionIndex = (selectedSectionIndex - 1 + 4) % 4;
+            NotifySectionChanged();
+        }
+
+        /// <summary>Move section selection right (wraps around)</summary>
+        public void SelectNextSection()
+        {
+            selectedSectionIndex = (selectedSectionIndex + 1) % 4;
+            NotifySectionChanged();
+        }
+
+        /// <summary>Select a specific section</summary>
+        public void SelectSection(OrchestraSection section)
+        {
+            selectedSectionIndex = (int)section;
+            NotifySectionChanged();
+        }
+
+        private void NotifySectionChanged()
+        {
+            OrchestraSection section = SelectedSection;
+            OnSectionChanged?.Invoke(section);
+
+            // Update orchestra highlight
+            if (orchestraPlacement != null)
+            {
+                orchestraPlacement.HighlightSection(selectedSectionIndex);
+            }
+
+            Debug.Log($"[RhythmGameController] Section changed to: {section}");
+        }
+
+        #endregion
+
+        #region Gesture Handling
+
+        private void HandleGestureReceived(LeftGestureEvent evt)
+        {
+            if (currentState != GameState.Playing) return;
+
+            GestureType gesture = evt.GetGestureType();
+            
+            Debug.Log($"[RhythmGameController] Processing gesture: {gesture}");
+
+            // Handle section navigation gestures (LEFT/RIGHT)
+            if (GestureUtils.IsSectionNavigation(gesture))
+            {
+                if (gesture == GestureType.LEFT)
+                    SelectPreviousSection();
+                else
+                    SelectNextSection();
+                
+                return; // Navigation gestures don't get scored
+            }
+
+            // Handle combo gestures - validate stick pattern
+            if (GestureUtils.IsComboGesture(gesture))
+            {
+                if (!ValidateComboGesture(gesture, evt.isClenched))
+                {
+                    Debug.Log($"[RhythmGameController] Combo gesture {gesture} failed validation");
+                    return;
+                }
+            }
+
+            // Judge timing against rhythm map
+            ScoringResult result = rhythmMap.JudgeGesture(gesture, SelectedSection);
+            ProcessScoringResult(result, gesture);
+        }
+
+        private void HandleDownstroke(float timestamp)
+        {
+            // Downstrokes are buffered by MQTTManager
+            // Used for beat visualization and combo validation
+            
+            if (hudController != null)
+            {
+                hudController.ShowBeatPulse();
+            }
+        }
+
+        private void HandleCueMissed(RhythmCue cue)
+        {
+            if (currentState != GameState.Playing) return;
+
+            // A cue passed without being hit
+            missCount++;
+            combo = 0;
+            OnScoreChanged?.Invoke(totalScore, combo);
+
+            if (hudController != null)
+            {
+                hudController.ShowJudgement(JudgementType.Miss, 0);
+            }
+
+            Debug.Log($"[RhythmGameController] Missed cue: {cue.gestureType} at {cue.timestamp}");
+        }
+
+        #endregion
+
+        #region Combo Gesture Validation
+
+        /// <summary>
+        /// Validate that a combo gesture has the required stick pattern.
+        /// </summary>
+        private bool ValidateComboGesture(GestureType gesture, bool isClenched)
+        {
+            if (!isClenched)
+            {
+                // Combo gestures require fist to be clenched
+                return false;
+            }
+
+            MQTTManager mqtt = MQTTManager.Instance;
+            if (mqtt == null) return false;
+
+            switch (gesture)
+            {
+                case GestureType.HOLD:
+                case GestureType.READY:
+                    // No strokes for 1+ beat - check if stick is still
+                    return mqtt.IsStickStill(1.0f);
+
+                case GestureType.STRONG_ACCENT:
+                    // Down-Up-Down pattern (3 strokes in quick succession)
+                    return mqtt.CountDownstrokes(comboStrokeWindow) >= 3;
+
+                case GestureType.CLEAR_CUTOFF:
+                    // One down then hold still
+                    return mqtt.CountDownstrokes(comboStrokeWindow) == 1 && 
+                           mqtt.IsStickStill(0.5f);
+
+                case GestureType.SUBDIVIDE:
+                    // Down-Up-Down-Up fast (4+ strokes)
+                    return mqtt.CountDownstrokes(comboStrokeWindow) >= 4;
+
+                case GestureType.BRING_OUT:
+                    // Up-Down-Up (3 strokes with up leading)
+                    return mqtt.CountDownstrokes(comboStrokeWindow) >= 2;
+
+                case GestureType.TRANSITION:
+                    // Down-Up-Down-Up then hold
+                    return mqtt.CountDownstrokes(comboStrokeWindow * 1.5f) >= 4 && 
+                           mqtt.IsStickStill(0.3f);
+
+                default:
+                    return true;
+            }
+        }
+
+        #endregion
+
+        #region Scoring
+
+        private void ProcessScoringResult(ScoringResult result, GestureType gesture)
+        {
+            // Update counts
+            switch (result.judgement)
+            {
+                case JudgementType.Perfect:
+                    perfectCount++;
+                    combo++;
+                    break;
+                case JudgementType.Good:
+                    goodCount++;
+                    combo++;
+                    break;
+                case JudgementType.Miss:
+                    missCount++;
+                    combo = 0;
+                    break;
+            }
+
+            // Update max combo
+            if (combo > maxCombo) maxCombo = combo;
+
+            // Calculate score with combo multiplier
+            int comboMultiplier = Mathf.Min(1 + combo / 10, 4); // Max 4x multiplier
+            int scoreGained = result.scoreAwarded * comboMultiplier;
+            totalScore += scoreGained;
+
+            // Notify listeners
+            OnGestureJudged?.Invoke(result);
+            OnScoreChanged?.Invoke(totalScore, combo);
+
+            // Apply audio effects
+            ApplyGestureAudioEffect(gesture, result);
+
+            // Apply visual effects
+            ApplyGestureVisualEffect(gesture, result);
+
+            // Update HUD
+            if (hudController != null)
+            {
+                hudController.ShowJudgement(result.judgement, result.timingOffset);
+                hudController.UpdateScore(totalScore, combo);
+            }
+
+            Debug.Log($"[RhythmGameController] {gesture}: {result.judgement} (offset: {result.timingOffset:F3}s, score: +{scoreGained})");
+        }
+
+        #endregion
+
+        #region Audio Effects
+
+        private void ApplyGestureAudioEffect(GestureType gesture, ScoringResult result)
+        {
+            if (audioMixer == null) return;
+
+            OrchestraSection section = result.targetSection;
+
+            switch (gesture)
+            {
+                case GestureType.UP:
+                case GestureType.V_SHAPE:
+                    // Increase volume
+                    audioMixer.IncreaseSectionVolume(section);
+                    break;
+
+                case GestureType.DOWN:
+                case GestureType.LAMBDA_SHAPE:
+                    // Decrease volume
+                    audioMixer.DecreaseSectionVolume(section);
+                    break;
+
+                case GestureType.PUNCH:
+                case GestureType.STRONG_ACCENT:
+                    // Accent/hit
+                    audioMixer.TriggerAccent(section);
+                    break;
+
+                case GestureType.WITHDRAW:
+                case GestureType.CLEAR_CUTOFF:
+                    // Cutoff
+                    audioMixer.TriggerCutoff(section);
+                    break;
+
+                // TODO: Implement tempo and timbre effects
+                default:
+                    break;
+            }
+        }
+
+        #endregion
+
+        #region Visual Effects
+
+        private void ApplyGestureVisualEffect(GestureType gesture, ScoringResult result)
+        {
+            if (orchestraPlacement == null) return;
+
+            // Trigger VFX on the target section
+            orchestraPlacement.TriggerHitFeedback(
+                (int)result.targetSection, 
+                result.judgement
+            );
+        }
+
+        #endregion
+    }
+}
