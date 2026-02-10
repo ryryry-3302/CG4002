@@ -29,6 +29,9 @@ namespace OrchestraMaestro
         public event Action<RhythmCue> OnCueApproaching;
         public event Action<RhythmCue> OnCueMissed;
 
+        /// <summary>Whether the rhythm map is currently playing</summary>
+        public bool IsPlaying => isPlaying;
+
         /// <summary>Current song time in seconds</summary>
         public float CurrentSongTime => isPlaying ? (float)(AudioSettings.dspTime - songStartDspTime) : 0f;
 
@@ -252,7 +255,8 @@ namespace OrchestraMaestro
                     judgement = JudgementType.Miss,
                     timingOffset = 0,
                     scoreAwarded = 0,
-                    targetSection = currentSection
+                    targetSection = currentSection,
+                    matchedCue = null
                 };
             }
 
@@ -287,7 +291,8 @@ namespace OrchestraMaestro
                 judgement = judgement,
                 timingOffset = bestOffset,
                 scoreAwarded = ScoringResult.GetScoreForJudgement(judgement),
-                targetSection = bestMatch.Value.targetSection ?? currentSection
+                targetSection = bestMatch.Value.targetSection ?? currentSection,
+                matchedCue = bestMatch
             };
         }
 

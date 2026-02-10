@@ -145,6 +145,7 @@ namespace OrchestraMaestro
         public float timingOffset;      // Negative = early, Positive = late
         public int scoreAwarded;
         public OrchestraSection targetSection;
+        public RhythmCue? matchedCue;   // The cue that was matched (if any)
 
         public static int GetScoreForJudgement(JudgementType judgement)
         {
