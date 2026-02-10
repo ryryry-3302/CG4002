@@ -213,6 +213,9 @@ public class OrchestraPlacement : MonoBehaviour
         }
     }
 
+    // Event when placements are locked
+    public event System.Action OnPlacementsLocked;
+
     public void LockPlacements()
     {
         isPlacementMode = false;
@@ -222,6 +225,10 @@ public class OrchestraPlacement : MonoBehaviour
             plane.gameObject.SetActive(false);
         }
         planeManager.enabled = false;
+        
+        // Notify listeners that placements are locked
+        OnPlacementsLocked?.Invoke();
+        Debug.Log("[OrchestraPlacement] Placements locked - ready to start game");
     }
 
     public void UnlockPlacements()
@@ -411,6 +418,33 @@ public class OrchestraPlacement : MonoBehaviour
     public List<GameObject> GetSectionMembers(OrchestraSection section)
     {
         return sectionMembers[(int)section];
+    }
+    
+    /// <summary>Get the average position of a section (for radar placement)</summary>
+    public Vector3? GetSectionPosition(OrchestraSection section)
+    {
+        List<GameObject> members = sectionMembers[(int)section];
+        
+        if (members == null || members.Count == 0)
+        {
+            return null;
+        }
+        
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        
+        foreach (var member in members)
+        {
+            if (member != null)
+            {
+                sum += member.transform.position;
+                count++;
+            }
+        }
+        
+        if (count == 0) return null;
+        
+        return sum / count;
     }
     
     /// <summary>Get all placed members</summary>

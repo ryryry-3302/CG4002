@@ -82,11 +82,21 @@ namespace OrchestraMaestro
                 rhythmMap.OnCueMissed += HandleCueMissed;
             }
 
-            // Auto-start test map for development
-            if (autoStartTestMap)
+            // Subscribe to orchestra placement lock event
+            if (orchestraPlacement != null)
             {
-                Invoke(nameof(StartTestGame), 1f);
+                orchestraPlacement.OnPlacementsLocked += HandlePlacementsLocked;
             }
+
+            // Only auto-start if autoStartTestMap is enabled AND we don't need to wait for placement
+            // (For testing without AR, set autoStartTestMap = true)
+            // For normal AR flow, leave it unchecked and game starts when you lock placements
+        }
+
+        private void HandlePlacementsLocked()
+        {
+            Debug.Log("[RhythmGameController] Placements locked - starting game!");
+            StartTestGame();
         }
 
         private void OnDestroy()
@@ -95,6 +105,11 @@ namespace OrchestraMaestro
             {
                 MQTTManager.Instance.OnGestureReceived -= HandleGestureReceived;
                 MQTTManager.Instance.OnDownstroke -= HandleDownstroke;
+            }
+
+            if (orchestraPlacement != null)
+            {
+                orchestraPlacement.OnPlacementsLocked -= HandlePlacementsLocked;
             }
 
             if (rhythmMap != null)
