@@ -36,10 +36,19 @@ public class OrchestraPlacement : MonoBehaviour
     private int selectedIndex = 0;
     private bool isPlacementMode = true;
     
+    // GUI interaction guard - prevents placement when tapping buttons
+    private bool guiConsumedInput = false;
+    private Rect guiAreaScreenRect; // The actual screen-pixel rect of the OnGUI panel
+    
     // Section grouping for conducting game
     private List<GameObject>[] sectionMembers = new List<GameObject>[4];
     private int currentHighlightedSection = -1;
     private Dictionary<Renderer, Color> originalColors = new Dictionary<Renderer, Color>();
+    
+    // Track which sections have a placed member (one per section limit)
+    private Dictionary<OrchestraSection, GameObject> sectionPlacedMember = new Dictionary<OrchestraSection, GameObject>();
+    // Track which section each placed member belongs to
+    private Dictionary<GameObject, OrchestraSection> memberToSection = new Dictionary<GameObject, OrchestraSection>();
     
     // Singleton
     public static OrchestraPlacement Instance { get; private set; }
@@ -75,6 +84,13 @@ public class OrchestraPlacement : MonoBehaviour
     {
         if (!isPlacementMode) return;
         
+        // If OnGUI consumed input this frame, skip placement
+        if (guiConsumedInput)
+        {
+            guiConsumedInput = false;
+            return;
+        }
+        
         // Check for touch input
         if (Input.touchCount > 0)
         {
@@ -83,8 +99,8 @@ public class OrchestraPlacement : MonoBehaviour
             // Only place on tap (not drag)
             if (touch.phase == TouchPhase.Began)
             {
-                // Ignore if touching UI area (top-left corner)
-                if (touch.position.x < 250 && touch.position.y > Screen.height - 500)
+                // Ignore if touching the GUI panel area
+                if (IsInsideGUIArea(touch.position))
                     return;
                 
                 TryPlaceObject(touch.position);
@@ -95,12 +111,33 @@ public class OrchestraPlacement : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             Vector2 mousePos = Input.mousePosition;
-            // Ignore UI area
-            if (mousePos.x < 250 && mousePos.y > Screen.height - 500)
+            // Ignore GUI panel area
+            if (IsInsideGUIArea(mousePos))
                 return;
                 
             TryPlaceObject(mousePos);
         }
+    }
+    
+    /// <summary>
+    /// Check if a screen position (Input coordinates, origin bottom-left) is inside the OnGUI panel.
+    /// OnGUI uses top-left origin and is scaled by GUI.matrix (3x), so we convert.
+    /// </summary>
+    private bool IsInsideGUIArea(Vector2 screenPos)
+    {
+        // OnGUI area: Rect(10, 10, 220, 500) with GUI.matrix scale 3x
+        // In actual screen pixels (from top-left): x=[30..690], y=[30..1530]
+        float guiScale = 3f;
+        float guiLeft = 10f * guiScale;    // 30
+        float guiTop = 10f * guiScale;     // 30
+        float guiWidth = 220f * guiScale;  // 660
+        float guiHeight = 500f * guiScale; // 1500
+        
+        // Convert Input screen pos (bottom-left origin) to top-left origin
+        float topLeftY = Screen.height - screenPos.y;
+        
+        return screenPos.x >= guiLeft && screenPos.x <= (guiLeft + guiWidth) &&
+               topLeftY >= guiTop && topLeftY <= (guiTop + guiHeight);
     }
 
     void TryPlaceObject(Vector2 screenPosition)
@@ -130,14 +167,32 @@ public class OrchestraPlacement : MonoBehaviour
         Vector3 scaledOffset = Vector3.Scale(prefab.transform.localPosition, prefab.transform.localScale);
         Vector3 finalPosition = position + (rotation * scaledOffset);
         
+        // Check section assignment
+        OrchestraSection section = GetSectionForPrefab(selectedIndex);
+        
+        // Enforce one member per section - remove existing if present
+        if (sectionPlacedMember.TryGetValue(section, out GameObject existing))
+        {
+            Debug.Log($"Section {section} already has a member - replacing it");
+            placedMembers.Remove(existing);
+            sectionMembers[(int)section].Remove(existing);
+            memberToSection.Remove(existing);
+            // Remove cached colors for old member
+            Renderer[] oldRenderers = existing.GetComponentsInChildren<Renderer>();
+            foreach (var r in oldRenderers)
+                originalColors.Remove(r);
+            Destroy(existing);
+        }
+        
         GameObject member = Instantiate(prefab, finalPosition, finalRotation);
         // Use the scale specified in the prefab instead of the script override
         member.transform.localScale = prefab.transform.localScale;
         placedMembers.Add(member);
         
         // Add to appropriate section
-        OrchestraSection section = GetSectionForPrefab(selectedIndex);
         sectionMembers[(int)section].Add(member);
+        sectionPlacedMember[section] = member;
+        memberToSection[member] = section;
         
         // Store original colors for highlighting
         CacheOriginalColors(member);
@@ -191,6 +246,20 @@ public class OrchestraPlacement : MonoBehaviour
         {
             GameObject last = placedMembers[placedMembers.Count - 1];
             placedMembers.RemoveAt(placedMembers.Count - 1);
+            
+            // Remove from section tracking
+            if (memberToSection.TryGetValue(last, out OrchestraSection section))
+            {
+                sectionMembers[(int)section].Remove(last);
+                sectionPlacedMember.Remove(section);
+                memberToSection.Remove(last);
+            }
+            
+            // Remove cached colors
+            Renderer[] renderers = last.GetComponentsInChildren<Renderer>();
+            foreach (var r in renderers)
+                originalColors.Remove(r);
+            
             Destroy(last);
         }
     }
@@ -203,6 +272,13 @@ public class OrchestraPlacement : MonoBehaviour
                 Destroy(member);
         }
         placedMembers.Clear();
+        
+        // Clear all section tracking
+        for (int i = 0; i < 4; i++)
+            sectionMembers[i].Clear();
+        sectionPlacedMember.Clear();
+        memberToSection.Clear();
+        originalColors.Clear();
     }
 
     public void TogglePlaneVisibility()
@@ -471,9 +547,15 @@ public class OrchestraPlacement : MonoBehaviour
         // Member selection
         GUILayout.Label("<b>Selected:</b>");
         string currentName = "None";
+        string sectionInfo = "";
         if (orchestraPrefabs != null && orchestraPrefabs.Length > 0 && orchestraPrefabs[selectedIndex] != null)
+        {
             currentName = orchestraPrefabs[selectedIndex].name;
-        GUILayout.Label($"  {selectedIndex + 1}/{orchestraPrefabs?.Length ?? 0}: {currentName}");
+            OrchestraSection sec = GetSectionForPrefab(selectedIndex);
+            bool alreadyPlaced = sectionPlacedMember.ContainsKey(sec);
+            sectionInfo = $" [{sec}]" + (alreadyPlaced ? " (placed)" : "");
+        }
+        GUILayout.Label($"  {selectedIndex + 1}/{orchestraPrefabs?.Length ?? 0}: {currentName}{sectionInfo}");
         
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("< Prev")) SelectPreviousMember();

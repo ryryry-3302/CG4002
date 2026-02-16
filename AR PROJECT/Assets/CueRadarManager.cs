@@ -24,8 +24,13 @@ namespace OrchestraMaestro
         [SerializeField] private OrchestraPlacement orchestraPlacement;
         [SerializeField] private RhythmMap rhythmMap;
         
-        // Radar instances (one per section)
+        [Header("3D Radar Settings")]
+        [SerializeField] private bool use3DRadar = true;  // Use 3D quads instead of Canvas
+        [SerializeField] private float radar3DSize = 0.4f; // Size in meters
+        
+        // Radar instances (one per section) - using interface pattern
         private CueRadarController[] radars = new CueRadarController[4];
+        private CueRadar3D[] radars3D = new CueRadar3D[4];
         
         // Cue queues per section
         private Queue<RhythmCue>[] cueQueues = new Queue<RhythmCue>[4];
@@ -158,6 +163,14 @@ namespace OrchestraMaestro
         {
             if (cueRadarPrefab == null)
             {
+                // Use 3D radars if enabled (more reliable in AR)
+                if (use3DRadar)
+                {
+                    Debug.Log("[CueRadarManager] Creating 3D radars (no prefab, use3DRadar=true)");
+                    Create3DRadars();
+                    return;
+                }
+                
                 Debug.LogWarning("[CueRadarManager] No radar prefab assigned. Creating placeholder radars.");
                 CreatePlaceholderRadars();
                 return;
@@ -170,19 +183,21 @@ namespace OrchestraMaestro
                 OrchestraSection section = (OrchestraSection)i;
                 Vector3 position = GetRadarPosition(section);
                 
-                // DEBUG: Also spawn a bright cube so we can see if position is correct
-                GameObject debugCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                debugCube.name = $"DebugCube_{section}";
-                debugCube.transform.position = position;
-                debugCube.transform.localScale = Vector3.one * 0.3f; // 30cm cube
-                debugCube.GetComponent<Renderer>().material.color = Color.magenta;
-                Debug.Log($"[CueRadarManager] Created debug cube for {section} at {position}");
-                
                 GameObject radarObj = Instantiate(cueRadarPrefab, position, Quaternion.identity);
                 radarObj.name = $"CueRadar_{section}";
                 
-                // Don't apply radarScale to prefab - use prefab's own scale
-                // radarObj.transform.localScale = Vector3.one * radarScale;
+                // Fix for AR: Set the Canvas camera and sorting
+                Canvas canvas = radarObj.GetComponentInChildren<Canvas>();
+                if (canvas != null)
+                {
+                    canvas.worldCamera = Camera.main;
+                    canvas.sortingOrder = 100; // Render on top
+                    Debug.Log($"[CueRadarManager] Set canvas camera for {section}");
+                }
+                else
+                {
+                    Debug.LogError($"[CueRadarManager] No Canvas found in prefab!");
+                }
                 
                 // Face camera
                 if (Camera.main != null)
@@ -199,15 +214,40 @@ namespace OrchestraMaestro
                     radars[i] = radarObj.AddComponent<CueRadarController>();
                 }
                 
-                // Ensure radar starts hidden but GameObject is active
-                // The CueRadarController will show/hide the visuals
+                // Keep radar active - don't hide it initially for debugging
                 radarObj.SetActive(true);
-                radars[i].Hide(); // This will deactivate it properly
+                // radars[i].Hide(); // Commented out for debugging
                 
                 Debug.Log($"[CueRadarManager] Spawned radar for {section} at {position}");
             }
             
             Debug.Log("[CueRadarManager] Spawned 4 cue radars from prefab");
+        }
+
+        private void Create3DRadars()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                OrchestraSection section = (OrchestraSection)i;
+                
+                // Only create radar if the section has placed instruments
+                Vector3? sectionPos = orchestraPlacement != null 
+                    ? orchestraPlacement.GetSectionPosition(section) 
+                    : null;
+                    
+                if (!sectionPos.HasValue)
+                {
+                    Debug.Log($"[CueRadarManager] Skipping radar for {section} - no instrument placed");
+                    radars3D[i] = null;
+                    continue;
+                }
+                
+                Vector3 position = GetRadarPosition(section);
+                radars3D[i] = CueRadar3D.Create(position, radar3DSize);
+                radars3D[i].gameObject.name = $"CueRadar3D_{section}";
+                
+                Debug.Log($"[CueRadarManager] Created 3D radar for {section} at {position}");
+            }
         }
 
         private void CreatePlaceholderRadars()
@@ -370,6 +410,14 @@ namespace OrchestraMaestro
                 // Update radar position (in case instruments moved)
                 UpdateRadarPosition(sectionIndex);
             }
+            else if (radars3D[sectionIndex] != null)
+            {
+                Debug.Log($"[CueRadarManager] Calling ShowCue on 3D radar {sectionIndex}");
+                radars3D[sectionIndex].ShowCue(nextCue.gestureType, timeUntilHit);
+                
+                // Update radar position
+                radars3D[sectionIndex].transform.position = GetRadarPosition((OrchestraSection)sectionIndex);
+            }
             else
             {
                 Debug.LogError($"[CueRadarManager] Radar {sectionIndex} is null!");
@@ -380,25 +428,36 @@ namespace OrchestraMaestro
         {
             for (int i = 0; i < 4; i++)
             {
-                if (!activeCues[i].HasValue || radars[i] == null) continue;
+                if (!activeCues[i].HasValue) continue;
                 
                 RhythmCue cue = activeCues[i].Value;
                 float remaining = cue.timestamp - (float)rhythmMap.CurrentSongTime;
                 
-                radars[i].UpdateTimer(remaining);
-                
-                // Make radar face camera
-                radars[i].transform.LookAt(Camera.main.transform);
-                radars[i].transform.Rotate(0, 180, 0);
+                if (radars[i] != null)
+                {
+                    radars[i].UpdateTimer(remaining);
+                    radars[i].transform.LookAt(Camera.main.transform);
+                    radars[i].transform.Rotate(0, 180, 0);
+                }
+                else if (radars3D[i] != null)
+                {
+                    radars3D[i].UpdateTimer(remaining);
+                    
+                    // Continuously reposition radar at its section's instrument position
+                    Vector3 targetPos = GetRadarPosition((OrchestraSection)i);
+                    radars3D[i].transform.position = targetPos;
+                    // 3D radar handles its own facing in Update()
+                }
             }
         }
 
         private void UpdateRadarPosition(int sectionIndex)
         {
-            if (radars[sectionIndex] == null) return;
-            
-            Vector3 newPos = GetRadarPosition((OrchestraSection)sectionIndex);
-            radars[sectionIndex].transform.position = newPos;
+            if (radars[sectionIndex] != null)
+            {
+                Vector3 newPos = GetRadarPosition((OrchestraSection)sectionIndex);
+                radars[sectionIndex].transform.position = newPos;
+            }
         }
 
         private int GetCueHash(RhythmCue cue)
@@ -422,14 +481,18 @@ namespace OrchestraMaestro
             
             int sectionIndex = (int)cue.targetSection.Value;
             
-            // Show miss feedback
-            if (radars[sectionIndex] != null && activeCues[sectionIndex].HasValue)
+            // Show miss feedback - check both Canvas and 3D radars
+            if (activeCues[sectionIndex].HasValue && 
+                Mathf.Approximately(activeCues[sectionIndex].Value.timestamp, cue.timestamp))
             {
-                if (Mathf.Approximately(activeCues[sectionIndex].Value.timestamp, cue.timestamp))
+                if (use3DRadar && radars3D[sectionIndex] != null)
+                {
+                    radars3D[sectionIndex].ShowResult(JudgementType.Miss);
+                    StartCoroutine(ShowNextCueDelayed(sectionIndex, 0.5f));
+                }
+                else if (radars[sectionIndex] != null)
                 {
                     radars[sectionIndex].ShowResult(JudgementType.Miss);
-                    
-                    // Show next queued cue after brief delay
                     StartCoroutine(ShowNextCueDelayed(sectionIndex, 0.5f));
                 }
             }
@@ -440,22 +503,28 @@ namespace OrchestraMaestro
             // Find which section this was for
             int sectionIndex = (int)result.targetSection;
             
-            if (radars[sectionIndex] != null && activeCues[sectionIndex].HasValue)
+            if (!activeCues[sectionIndex].HasValue) return;
+            
+            // Check if this result matches the active cue (or just accept it for the section)
+            bool isMatch = true;
+            if (result.matchedCue.HasValue)
             {
-                // Check if this result matches the active cue (or just accept it for the section)
-                bool isMatch = true;
-                if (result.matchedCue.HasValue)
+                // Verify the matched cue corresponds to our active cue
+                isMatch = Mathf.Approximately(result.matchedCue.Value.timestamp, 
+                                               activeCues[sectionIndex].Value.timestamp);
+            }
+            
+            if (isMatch)
+            {
+                // Show result on the appropriate radar type
+                if (use3DRadar && radars3D[sectionIndex] != null)
                 {
-                    // Verify the matched cue corresponds to our active cue
-                    isMatch = Mathf.Approximately(result.matchedCue.Value.timestamp, 
-                                                   activeCues[sectionIndex].Value.timestamp);
+                    radars3D[sectionIndex].ShowResult(result.judgement);
+                    StartCoroutine(ShowNextCueDelayed(sectionIndex, 0.5f));
                 }
-                
-                if (isMatch)
+                else if (radars[sectionIndex] != null)
                 {
                     radars[sectionIndex].ShowResult(result.judgement);
-                    
-                    // Show next queued cue after brief delay
                     StartCoroutine(ShowNextCueDelayed(sectionIndex, 0.5f));
                 }
             }
@@ -484,6 +553,10 @@ namespace OrchestraMaestro
                 if (radars[i] != null)
                 {
                     radars[i].Hide();
+                }
+                if (radars3D[i] != null)
+                {
+                    radars3D[i].Hide();
                 }
             }
             
