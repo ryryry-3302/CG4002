@@ -67,6 +67,13 @@ public class OrchestraPlacement : MonoBehaviour
     private GUIStyle hudBoxStyle;
     private bool stylesInitialized = false;
     
+    // Persist textures so GC doesn't destroy them
+    private Texture2D texDarkBg;
+    private Texture2D texAccentBg;
+    private Texture2D texAccentHover;
+    private Texture2D texSubtleBg;
+    private Texture2D texSubtleHover;
+    
     // Singleton
     public static OrchestraPlacement Instance { get; private set; }
 
@@ -314,6 +321,26 @@ public class OrchestraPlacement : MonoBehaviour
             plane.gameObject.SetActive(!plane.gameObject.activeSelf);
         }
     }
+    
+    /// <summary>Remove all tracked planes and restart plane detection from scratch</summary>
+    public void RescanPlanes()
+    {
+        // Reset the AR session which clears all trackables (planes, anchors, etc.)
+        // and starts fresh detection
+        var arSession = FindObjectOfType<UnityEngine.XR.ARFoundation.ARSession>();
+        if (arSession != null)
+        {
+            arSession.Reset();
+            Debug.Log("[OrchestraPlacement] AR session reset - rescanning environment...");
+        }
+        else
+        {
+            // Fallback: just toggle the plane manager
+            planeManager.enabled = false;
+            planeManager.enabled = true;
+            Debug.Log("[OrchestraPlacement] Toggled plane manager - rescanning...");
+        }
+    }
 
     // Event when placements are locked
     public event System.Action OnPlacementsLocked;
@@ -368,6 +395,42 @@ public class OrchestraPlacement : MonoBehaviour
     {
         isPlacementMode = true;
         planeManager.enabled = true;
+        
+        // Show existing detected planes again
+        foreach (var plane in planeManager.trackables)
+        {
+            plane.gameObject.SetActive(true);
+        }
+        
+        // Clean up game state if a game was running
+        if (RhythmGameController.Instance != null)
+        {
+            RhythmGameController.Instance.OnGestureJudged -= OnGestureJudgedHUD;
+            
+            // Stop the game if it's playing or in results
+            if (RhythmGameController.Instance.CurrentState == RhythmGameController.GameState.Playing ||
+                RhythmGameController.Instance.CurrentState == RhythmGameController.GameState.Results)
+            {
+                RhythmGameController.Instance.EndGame();
+            }
+        }
+        
+        // Clean up radars
+        if (CueRadarManager.Instance != null)
+        {
+            CueRadarManager.Instance.ResetForNewGame();
+        }
+        
+        // Hide the Canvas HUD
+        if (HUDController.Instance != null)
+        {
+            HUDController.Instance.HideAll();
+        }
+        
+        // Clear section highlights
+        ClearHighlight();
+        
+        Debug.Log("[OrchestraPlacement] Unlocked - back to placement mode");
     }
 
     #region Section Highlighting & Feedback
@@ -609,28 +672,28 @@ public class OrchestraPlacement : MonoBehaviour
         stylesInitialized = true;
         
         // Dark semi-transparent box
-        Texture2D darkBg = new Texture2D(1, 1);
-        darkBg.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.12f, 0.85f));
-        darkBg.Apply();
+        texDarkBg = new Texture2D(1, 1);
+        texDarkBg.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.12f, 0.85f));
+        texDarkBg.Apply();
         
-        Texture2D accentBg = new Texture2D(1, 1);
-        accentBg.SetPixel(0, 0, new Color(0.15f, 0.4f, 0.9f, 0.9f));
-        accentBg.Apply();
+        texAccentBg = new Texture2D(1, 1);
+        texAccentBg.SetPixel(0, 0, new Color(0.15f, 0.4f, 0.9f, 0.9f));
+        texAccentBg.Apply();
         
-        Texture2D accentHover = new Texture2D(1, 1);
-        accentHover.SetPixel(0, 0, new Color(0.25f, 0.5f, 1f, 0.95f));
-        accentHover.Apply();
+        texAccentHover = new Texture2D(1, 1);
+        texAccentHover.SetPixel(0, 0, new Color(0.25f, 0.5f, 1f, 0.95f));
+        texAccentHover.Apply();
         
-        Texture2D subtleBg = new Texture2D(1, 1);
-        subtleBg.SetPixel(0, 0, new Color(0.2f, 0.2f, 0.3f, 0.8f));
-        subtleBg.Apply();
+        texSubtleBg = new Texture2D(1, 1);
+        texSubtleBg.SetPixel(0, 0, new Color(0.2f, 0.2f, 0.3f, 0.8f));
+        texSubtleBg.Apply();
         
-        Texture2D subtleHover = new Texture2D(1, 1);
-        subtleHover.SetPixel(0, 0, new Color(0.3f, 0.3f, 0.45f, 0.85f));
-        subtleHover.Apply();
+        texSubtleHover = new Texture2D(1, 1);
+        texSubtleHover.SetPixel(0, 0, new Color(0.3f, 0.3f, 0.45f, 0.85f));
+        texSubtleHover.Apply();
         
         hudBoxStyle = new GUIStyle(GUI.skin.box);
-        hudBoxStyle.normal.background = darkBg;
+        hudBoxStyle.normal.background = texDarkBg;
         hudBoxStyle.padding = new RectOffset(12, 12, 10, 10);
         
         headerStyle = new GUIStyle(GUI.skin.label);
@@ -647,9 +710,9 @@ public class OrchestraPlacement : MonoBehaviour
         buttonStyle = new GUIStyle(GUI.skin.button);
         buttonStyle.fontSize = 10;
         buttonStyle.fontStyle = FontStyle.Bold;
-        buttonStyle.normal.background = subtleBg;
-        buttonStyle.hover.background = subtleHover;
-        buttonStyle.active.background = accentBg;
+        buttonStyle.normal.background = texSubtleBg;
+        buttonStyle.hover.background = texSubtleHover;
+        buttonStyle.active.background = texAccentBg;
         buttonStyle.normal.textColor = Color.white;
         buttonStyle.hover.textColor = Color.white;
         buttonStyle.active.textColor = Color.white;
@@ -681,7 +744,7 @@ public class OrchestraPlacement : MonoBehaviour
     private void DrawPlacementUI()
     {
         float panelW = 200f;
-        float panelH = 340f;
+        float panelH = 380f;
         GUILayout.BeginArea(new Rect(10, 10, panelW, panelH), hudBoxStyle);
         
         GUILayout.Label("🎵 ORCHESTRA SETUP", headerStyle);
@@ -689,7 +752,12 @@ public class OrchestraPlacement : MonoBehaviour
         
         // Status line
         int placedCount = sectionPlacedMember.Count;
-        GUILayout.Label($"Placed: {placedCount}/4 sections", labelStyle);
+        int planeCount = 0;
+        if (planeManager != null)
+        {
+            foreach (var p in planeManager.trackables) planeCount++;
+        }
+        GUILayout.Label($"Planes: {planeCount}  |  Placed: {placedCount}/4", labelStyle);
         
         // Section placement status dots
         GUILayout.BeginHorizontal();
@@ -729,6 +797,8 @@ public class OrchestraPlacement : MonoBehaviour
             UndoLastPlacement();
         if (GUILayout.Button("✕ Clear All", buttonStyle))
             ClearAllPlacements();
+        if (GUILayout.Button("🔄 Rescan Planes", buttonStyle))
+            RescanPlanes();
         
         GUILayout.Space(8);
         
@@ -747,6 +817,15 @@ public class OrchestraPlacement : MonoBehaviour
     
     private void DrawGameplayHUD()
     {
+        var gameState = RhythmGameController.Instance?.CurrentState 
+            ?? RhythmGameController.GameState.Setup;
+        
+        if (gameState == RhythmGameController.GameState.Results)
+        {
+            DrawResultsScreen();
+            return;
+        }
+        
         float hudW = 160f;
         float hudH = 100f;
         
@@ -790,6 +869,46 @@ public class OrchestraPlacement : MonoBehaviour
         {
             UnlockPlacements();
         }
+    }
+    
+    private void DrawResultsScreen()
+    {
+        var ctrl = RhythmGameController.Instance;
+        if (ctrl == null) return;
+        
+        float panelW = 200f;
+        float panelH = 260f;
+        float centerX = (Screen.width / 3f - panelW) / 2f;
+        float centerY = (Screen.height / 3f - panelH) / 2f;
+        
+        GUILayout.BeginArea(new Rect(centerX, centerY, panelW, panelH), hudBoxStyle);
+        
+        GUILayout.Label("🎵 ROUND COMPLETE", headerStyle);
+        GUILayout.Space(10);
+        
+        GUILayout.Label(ctrl.TotalScore.ToString("N0"), scoreStyle);
+        GUILayout.Space(6);
+        
+        GUILayout.Label($"<color=#44FF88>✦ Perfect:</color> {ctrl.PerfectCount}", labelStyle);
+        GUILayout.Label($"<color=#FFEE33>Good:</color> {ctrl.GoodCount}", labelStyle);
+        GUILayout.Label($"<color=#FF5555>Miss:</color> {ctrl.MissCount}", labelStyle);
+        GUILayout.Label($"Max Combo: {ctrl.MaxCombo}x", labelStyle);
+        
+        GUILayout.Space(12);
+        
+        if (GUILayout.Button("▶ PLAY AGAIN", buttonStyle, GUILayout.Height(30)))
+        {
+            ctrl.RestartGame();
+        }
+        
+        GUILayout.Space(4);
+        
+        if (GUILayout.Button("✎ Edit Placement", buttonStyle))
+        {
+            UnlockPlacements();
+        }
+        
+        GUILayout.EndArea();
     }
 }
 

@@ -14,7 +14,7 @@ namespace OrchestraMaestro
         
         [Header("Radar Positioning")]
         [SerializeField] private float radarDistance = 0.5f;  // Distance in front of instrument
-        [SerializeField] private float radarHeight = 0.3f;    // Height above ground
+        [SerializeField] private float radarHeight = 0.6f;    // Height above ground
         [SerializeField] private float radarScale = 0.5f;     // World scale of radar
         
         [Header("Timing")]
@@ -148,9 +148,9 @@ namespace OrchestraMaestro
                 for (int i = 0; i < 4; i++)
                 {
                     if (radars[i] != null)
-                    {
                         radars[i].Hide();
-                    }
+                    if (radars3D[i] != null)
+                        radars3D[i].Hide();
                 }
             }
         }
@@ -552,6 +552,37 @@ namespace OrchestraMaestro
         #endregion
 
         #region Public Methods
+
+        /// <summary>
+        /// Full reset for starting a new game. Destroys old radars so fresh ones are spawned.
+        /// </summary>
+        public void ResetForNewGame()
+        {
+            // Clear cue queues and active cues
+            for (int i = 0; i < 4; i++)
+            {
+                cueQueues[i].Clear();
+                activeCues[i] = null;
+                
+                // Destroy old Canvas radars
+                if (radars[i] != null)
+                {
+                    Destroy(radars[i].gameObject);
+                    radars[i] = null;
+                }
+                // Destroy old 3D radars
+                if (radars3D[i] != null)
+                {
+                    Destroy(radars3D[i].gameObject);
+                    radars3D[i] = null;
+                }
+            }
+            
+            queuedCueHashes.Clear();
+            radarsSpawned = false;
+            
+            Debug.Log("[CueRadarManager] Reset for new game - radars destroyed, ready to respawn");
+        }
 
         /// <summary>
         /// Clear all queued cues and hide radars (for game reset)
