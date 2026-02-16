@@ -196,9 +196,8 @@ public class OrchestraPlacement : MonoBehaviour
         // Combine the hit rotation (surface alignment) with the prefab's inherent rotation
         Quaternion finalRotation = rotation * prefab.transform.rotation;
 
-        // Calculate final position using the prefab's local scale for the offset to match the object's dimensions
-        Vector3 scaledOffset = Vector3.Scale(prefab.transform.localPosition, prefab.transform.localScale);
-        Vector3 finalPosition = position + (rotation * scaledOffset);
+        // Place directly at the hit position (no offset from prefab localPosition)
+        Vector3 finalPosition = position;
         
         // Check section assignment
         OrchestraSection section = GetSectionForPrefab(selectedIndex);
@@ -220,6 +219,23 @@ public class OrchestraPlacement : MonoBehaviour
         GameObject member = Instantiate(prefab, finalPosition, finalRotation);
         // Use the scale specified in the prefab instead of the script override
         member.transform.localScale = prefab.transform.localScale;
+        
+        // Correct for off-center mesh geometry in FBX models:
+        // Calculate the visual center offset from the renderers' bounds and shift the object
+        // so the visual center aligns with the tap position
+        Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+        if (renderers.Length > 0)
+        {
+            Bounds combinedBounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+                combinedBounds.Encapsulate(renderers[i].bounds);
+            
+            // Only correct horizontal offset (X/Z), keep Y at the hit surface
+            Vector3 boundsCenter = combinedBounds.center;
+            Vector3 correction = member.transform.position - boundsCenter;
+            correction.y = 0f; // Don't shift vertically
+            member.transform.position += correction;
+        }
         placedMembers.Add(member);
         
         // Add to appropriate section
@@ -230,7 +246,7 @@ public class OrchestraPlacement : MonoBehaviour
         // Store original colors for highlighting
         CacheOriginalColors(member);
         
-        Debug.Log($"Placed {prefab.name} at {finalPosition} in section {section}");
+        Debug.Log($"Placed {prefab.name} at {member.transform.position} (hit: {position}) in section {section}");
     }
     
     /// <summary>Get the section assignment for a prefab index</summary>
@@ -633,7 +649,23 @@ public class OrchestraPlacement : MonoBehaviour
         {
             if (member != null)
             {
-                sum += member.transform.position;
+                // Use the visual center (renderer bounds) instead of the raw transform position
+                // This accounts for FBX models whose mesh geometry is offset from the transform origin
+                Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0)
+                {
+                    Bounds combinedBounds = renderers[0].bounds;
+                    for (int i = 1; i < renderers.Length; i++)
+                        combinedBounds.Encapsulate(renderers[i].bounds);
+                    // Use horizontal center of bounds, but keep the ground-level Y from the transform
+                    Vector3 visualCenter = combinedBounds.center;
+                    visualCenter.y = member.transform.position.y;
+                    sum += visualCenter;
+                }
+                else
+                {
+                    sum += member.transform.position;
+                }
                 count++;
             }
         }

@@ -598,8 +598,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cueRadarPrefab: {fileID: 0}
   radarDistance: 0
-  radarHeight: 0.5
-  radarScale: 100
+  radarHeight: 1
+  radarScale: 70
   cueLeadTime: 2
   orchestraPlacement: {fileID: 1141421495}
   rhythmMap: {fileID: 164925909}
