@@ -226,6 +226,14 @@ namespace OrchestraMaestro
 
         private void Create3DRadars()
         {
+            // Debug: log all section positions
+            for (int i = 0; i < 4; i++)
+            {
+                OrchestraSection section = (OrchestraSection)i;
+                Vector3? pos = orchestraPlacement != null ? orchestraPlacement.GetSectionPosition(section) : null;
+                Debug.Log($"[CueRadarManager] Section {section} position: {(pos.HasValue ? pos.Value.ToString() : "NONE (no instrument placed)")}");
+            }
+            
             for (int i = 0; i < 4; i++)
             {
                 OrchestraSection section = (OrchestraSection)i;
@@ -237,7 +245,7 @@ namespace OrchestraMaestro
                     
                 if (!sectionPos.HasValue)
                 {
-                    Debug.Log($"[CueRadarManager] Skipping radar for {section} - no instrument placed");
+                    Debug.LogWarning($"[CueRadarManager] Skipping radar for {section} - no instrument placed! Cues for this section will have no radar.");
                     radars3D[i] = null;
                     continue;
                 }
@@ -246,8 +254,13 @@ namespace OrchestraMaestro
                 radars3D[i] = CueRadar3D.Create(position, radar3DSize);
                 radars3D[i].gameObject.name = $"CueRadar3D_{section}";
                 
-                Debug.Log($"[CueRadarManager] Created 3D radar for {section} at {position}");
+                Debug.Log($"[CueRadarManager] Created 3D radar for {section} at {position} (instrument at {sectionPos.Value})");
             }
+            
+            // Summary
+            int created = 0;
+            for (int i = 0; i < 4; i++) { if (radars3D[i] != null) created++; }
+            Debug.Log($"[CueRadarManager] Created {created}/4 radars. Place instruments for all 4 sections to see all radars.");
         }
 
         private void CreatePlaceholderRadars()

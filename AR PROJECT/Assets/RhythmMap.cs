@@ -79,30 +79,42 @@ namespace OrchestraMaestro
 
         /// <summary>
         /// Load a test/demo rhythm map for development.
+        /// One cue at a time, cycling through sections. Only UP, DOWN, PUNCH gestures.
         /// </summary>
         public void LoadTestMap()
         {
             cues.Clear();
             nextCueIndex = 0;
 
-            // Simple test pattern: gesture every 2 seconds
-            float time = 2f;
-            GestureType[] testGestures = { 
-                GestureType.DOWN, GestureType.UP, GestureType.PUNCH, 
-                GestureType.LEFT, GestureType.RIGHT, GestureType.DOWN 
+            // Only the 3 mapped gestures
+            GestureType[] gesturePool = { 
+                GestureType.UP, GestureType.DOWN, GestureType.PUNCH
+            };
+            
+            // Cycle through sections one at a time
+            OrchestraSection[] sections = {
+                OrchestraSection.Drum,
+                OrchestraSection.Flute,
+                OrchestraSection.Pipe,
+                OrchestraSection.Xylophone
             };
 
-            foreach (var gesture in testGestures)
+            int totalCues = 16;          // 16 cues total (4 full cycles through sections)
+            float startTime = 3f;        // First cue at 3s
+            float cueInterval = 3f;      // 3s between each cue
+
+            for (int i = 0; i < totalCues; i++)
             {
-                OrchestraSection? section = GestureUtils.IsSectionNavigation(gesture) 
-                    ? null 
-                    : OrchestraSection.Drum;
+                float timestamp = startTime + i * cueInterval;
+                OrchestraSection section = sections[i % sections.Length];
+                GestureType gesture = gesturePool[i % gesturePool.Length];
                 
-                cues.Add(new RhythmCue(time, gesture, section));
-                time += 2f;
+                cues.Add(new RhythmCue(timestamp, gesture, section));
+                
+                Debug.Log($"[RhythmMap] TestMap: cue {i}, t={timestamp}, {section} => {gesture}");
             }
 
-            Debug.Log($"[RhythmMap] Loaded test map with {cues.Count} cues");
+            Debug.Log($"[RhythmMap] Loaded test map with {cues.Count} cues (one at a time, cycling sections)");
         }
 
         #endregion
