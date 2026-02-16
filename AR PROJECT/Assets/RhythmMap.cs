@@ -28,6 +28,9 @@ namespace OrchestraMaestro
         // Events
         public event Action<RhythmCue> OnCueApproaching;
         public event Action<RhythmCue> OnCueMissed;
+        public event Action OnSongFinished;
+        
+        private bool songFinished = false;
 
         /// <summary>Whether the rhythm map is currently playing</summary>
         public bool IsPlaying => isPlaying;
@@ -127,6 +130,7 @@ namespace OrchestraMaestro
             songStartDspTime = AudioSettings.dspTime;
             nextCueIndex = 0;
             isPlaying = true;
+            songFinished = false;
             
             // Reset consumed flags
             for (int i = 0; i < cues.Count; i++)
@@ -183,6 +187,24 @@ namespace OrchestraMaestro
                     
                     // Advance next cue index
                     if (i == nextCueIndex) nextCueIndex++;
+                }
+            }
+            
+            // Check if song is finished (all cues consumed + grace period)
+            if (!songFinished && nextCueIndex >= cues.Count)
+            {
+                // Check that all cues are consumed
+                bool allConsumed = true;
+                for (int i = 0; i < cues.Count; i++)
+                {
+                    if (!cues[i].consumed) { allConsumed = false; break; }
+                }
+                
+                if (allConsumed)
+                {
+                    songFinished = true;
+                    Debug.Log("[RhythmMap] All cues consumed - song finished!");
+                    OnSongFinished?.Invoke();
                 }
             }
         }

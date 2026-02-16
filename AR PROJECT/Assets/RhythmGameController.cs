@@ -80,6 +80,7 @@ namespace OrchestraMaestro
             if (rhythmMap != null)
             {
                 rhythmMap.OnCueMissed += HandleCueMissed;
+                rhythmMap.OnSongFinished += HandleSongFinished;
             }
 
             // Subscribe to orchestra placement lock event
@@ -115,6 +116,7 @@ namespace OrchestraMaestro
             if (rhythmMap != null)
             {
                 rhythmMap.OnCueMissed -= HandleCueMissed;
+                rhythmMap.OnSongFinished -= HandleSongFinished;
             }
 
             if (Instance == this) Instance = null;
@@ -301,6 +303,27 @@ namespace OrchestraMaestro
             }
 
             Debug.Log($"[RhythmGameController] Missed cue: {cue.gestureType} at {cue.timestamp}");
+        }
+        
+        private void HandleSongFinished()
+        {
+            if (currentState != GameState.Playing) return;
+            Debug.Log("[RhythmGameController] Song finished - ending game");
+            EndGame();
+        }
+        
+        /// <summary>Restart the game with the same map (keeps placements)</summary>
+        public void RestartGame()
+        {
+            Debug.Log("[RhythmGameController] Restarting game...");
+            
+            // Reset cue radar manager
+            if (CueRadarManager.Instance != null)
+            {
+                CueRadarManager.Instance.ResetForNewGame();
+            }
+            
+            StartTestGame();
         }
 
         #endregion

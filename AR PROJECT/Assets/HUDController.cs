@@ -434,6 +434,10 @@ namespace OrchestraMaestro
         {
             switch (state)
             {
+                case RhythmGameController.GameState.Setup:
+                    HideAll();
+                    break;
+                    
                 case RhythmGameController.GameState.Playing:
                     if (playingUI != null) playingUI.SetActive(true);
                     if (resultsUI != null) resultsUI.SetActive(false);
@@ -443,6 +447,15 @@ namespace OrchestraMaestro
                     ShowResults();
                     break;
             }
+        }
+        
+        /// <summary>Hide all HUD elements (for returning to placement mode)</summary>
+        public void HideAll()
+        {
+            if (playingUI != null) playingUI.SetActive(false);
+            if (resultsUI != null) resultsUI.SetActive(false);
+            HideJudgement();
+            HidePrompt();
         }
         
         /// <summary>Show the results screen</summary>
