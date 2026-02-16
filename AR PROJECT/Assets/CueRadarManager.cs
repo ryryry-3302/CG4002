@@ -14,7 +14,7 @@ namespace OrchestraMaestro
         
         [Header("Radar Positioning")]
         [SerializeField] private float radarDistance = 0.5f;  // Distance in front of instrument
-        [SerializeField] private float radarHeight = 0.6f;    // Height above ground
+        [SerializeField] private float radarHeight = 2.0f;    // Height above ground
         [SerializeField] private float radarScale = 0.5f;     // World scale of radar
         
         [Header("Timing")]

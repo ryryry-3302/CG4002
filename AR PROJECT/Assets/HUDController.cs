@@ -77,13 +77,8 @@ namespace OrchestraMaestro
                 RhythmGameController.Instance.OnGameStateChanged += OnGameStateChanged;
             }
             
-            // Initial state
-            UpdateScore(0, 0);
-            UpdateSectionIndicator(0);
-            HideJudgement();
-            
-            if (playingUI != null) playingUI.SetActive(true);
-            if (resultsUI != null) resultsUI.SetActive(false);
+            // Initial state - hide all Canvas elements since OnGUI handles HUD rendering
+            HideAll();
         }
         
         private void OnDestroy()
@@ -432,21 +427,9 @@ namespace OrchestraMaestro
         
         private void OnGameStateChanged(RhythmGameController.GameState state)
         {
-            switch (state)
-            {
-                case RhythmGameController.GameState.Setup:
-                    HideAll();
-                    break;
-                    
-                case RhythmGameController.GameState.Playing:
-                    if (playingUI != null) playingUI.SetActive(true);
-                    if (resultsUI != null) resultsUI.SetActive(false);
-                    break;
-                    
-                case RhythmGameController.GameState.Results:
-                    ShowResults();
-                    break;
-            }
+            // OnGUI in OrchestraPlacement handles all HUD/results rendering,
+            // so always hide Canvas elements to prevent overlap
+            HideAll();
         }
         
         /// <summary>Hide all HUD elements (for returning to placement mode)</summary>
