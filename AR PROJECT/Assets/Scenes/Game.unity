@@ -596,13 +596,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ea4a0fadb1dd10f3bbb4e7df46b0a924, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cueRadarPrefab: {fileID: 396604019388318542, guid: e0cbd1aa342a14e44877b1a71e1bb6d3, type: 3}
+  cueRadarPrefab: {fileID: 0}
   radarDistance: 0
   radarHeight: 0.5
   radarScale: 100
   cueLeadTime: 2
   orchestraPlacement: {fileID: 1141421495}
   rhythmMap: {fileID: 164925909}
+  use3DRadar: 1
+  radar3DSize: 0.4
 --- !u!114 &164925911
 MonoBehaviour:
   m_ObjectHideFlags: 0
