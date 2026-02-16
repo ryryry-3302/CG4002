@@ -50,6 +50,23 @@ public class OrchestraPlacement : MonoBehaviour
     // Track which section each placed member belongs to
     private Dictionary<GameObject, OrchestraSection> memberToSection = new Dictionary<GameObject, OrchestraSection>();
     
+    // Gameplay HUD state
+    private string lastJudgement = "";
+    private Color lastJudgementColor = Color.white;
+    private float judgementTimer = 0f;
+    private float judgementDisplayTime = 1.0f;
+    
+    // Custom GUI styles (lazy-initialized)
+    private GUIStyle headerStyle;
+    private GUIStyle labelStyle;
+    private GUIStyle buttonStyle;
+    private GUIStyle sectionLabelStyle;
+    private GUIStyle judgementStyle;
+    private GUIStyle comboStyle;
+    private GUIStyle scoreStyle;
+    private GUIStyle hudBoxStyle;
+    private bool stylesInitialized = false;
+    
     // Singleton
     public static OrchestraPlacement Instance { get; private set; }
 
@@ -78,10 +95,20 @@ public class OrchestraPlacement : MonoBehaviour
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        
+        // Unsubscribe from game events
+        if (RhythmGameController.Instance != null)
+        {
+            RhythmGameController.Instance.OnGestureJudged -= OnGestureJudgedHUD;
+        }
     }
 
     void Update()
     {
+        // Tick judgement display timer
+        if (judgementTimer > 0)
+            judgementTimer -= Time.deltaTime;
+        
         if (!isPlacementMode) return;
         
         // If OnGUI consumed input this frame, skip placement
@@ -125,13 +152,12 @@ public class OrchestraPlacement : MonoBehaviour
     /// </summary>
     private bool IsInsideGUIArea(Vector2 screenPos)
     {
-        // OnGUI area: Rect(10, 10, 220, 500) with GUI.matrix scale 3x
-        // In actual screen pixels (from top-left): x=[30..690], y=[30..1530]
+        // Placement panel: Rect(10, 10, 200, 340) with GUI.matrix scale 3x
         float guiScale = 3f;
-        float guiLeft = 10f * guiScale;    // 30
-        float guiTop = 10f * guiScale;     // 30
-        float guiWidth = 220f * guiScale;  // 660
-        float guiHeight = 500f * guiScale; // 1500
+        float guiLeft = 10f * guiScale;     // 30
+        float guiTop = 10f * guiScale;      // 30
+        float guiWidth = 200f * guiScale;   // 600
+        float guiHeight = 340f * guiScale;  // 1020
         
         // Convert Input screen pos (bottom-left origin) to top-left origin
         float topLeftY = Screen.height - screenPos.y;
@@ -302,9 +328,40 @@ public class OrchestraPlacement : MonoBehaviour
         }
         planeManager.enabled = false;
         
+        // Subscribe to game events for HUD
+        Invoke(nameof(SubscribeGameHUD), 0.2f);
+        
         // Notify listeners that placements are locked
         OnPlacementsLocked?.Invoke();
         Debug.Log("[OrchestraPlacement] Placements locked - ready to start game");
+    }
+    
+    private void SubscribeGameHUD()
+    {
+        if (RhythmGameController.Instance != null)
+        {
+            RhythmGameController.Instance.OnGestureJudged += OnGestureJudgedHUD;
+        }
+    }
+    
+    private void OnGestureJudgedHUD(ScoringResult result)
+    {
+        judgementTimer = judgementDisplayTime;
+        switch (result.judgement)
+        {
+            case JudgementType.Perfect:
+                lastJudgement = "✦ PERFECT ✦";
+                lastJudgementColor = new Color(0.2f, 1f, 0.6f);
+                break;
+            case JudgementType.Good:
+                lastJudgement = "GOOD";
+                lastJudgementColor = new Color(1f, 0.9f, 0.2f);
+                break;
+            default:
+                lastJudgement = "MISS";
+                lastJudgementColor = new Color(1f, 0.35f, 0.35f);
+                break;
+        }
     }
 
     public void UnlockPlacements()
@@ -533,64 +590,206 @@ public class OrchestraPlacement : MonoBehaviour
 
     void OnGUI()
     {
+        InitStyles();
         GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * 3);
         
-        GUILayout.BeginArea(new Rect(10, 10, 220, 500));
+        if (isPlacementMode)
+        {
+            DrawPlacementUI();
+        }
+        else
+        {
+            DrawGameplayHUD();
+        }
+    }
+    
+    private void InitStyles()
+    {
+        if (stylesInitialized) return;
+        stylesInitialized = true;
         
-        // Status
-        GUILayout.Label($"<b>Planes Found:</b> {planeManager?.trackables.count ?? 0}");
-        GUILayout.Label($"<b>Placed:</b> {placedMembers.Count} members");
-        GUILayout.Label($"<b>Mode:</b> {(isPlacementMode ? "PLACING" : "LOCKED")}");
+        // Dark semi-transparent box
+        Texture2D darkBg = new Texture2D(1, 1);
+        darkBg.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.12f, 0.85f));
+        darkBg.Apply();
         
-        GUILayout.Space(10);
+        Texture2D accentBg = new Texture2D(1, 1);
+        accentBg.SetPixel(0, 0, new Color(0.15f, 0.4f, 0.9f, 0.9f));
+        accentBg.Apply();
         
-        // Member selection
-        GUILayout.Label("<b>Selected:</b>");
+        Texture2D accentHover = new Texture2D(1, 1);
+        accentHover.SetPixel(0, 0, new Color(0.25f, 0.5f, 1f, 0.95f));
+        accentHover.Apply();
+        
+        Texture2D subtleBg = new Texture2D(1, 1);
+        subtleBg.SetPixel(0, 0, new Color(0.2f, 0.2f, 0.3f, 0.8f));
+        subtleBg.Apply();
+        
+        Texture2D subtleHover = new Texture2D(1, 1);
+        subtleHover.SetPixel(0, 0, new Color(0.3f, 0.3f, 0.45f, 0.85f));
+        subtleHover.Apply();
+        
+        hudBoxStyle = new GUIStyle(GUI.skin.box);
+        hudBoxStyle.normal.background = darkBg;
+        hudBoxStyle.padding = new RectOffset(12, 12, 10, 10);
+        
+        headerStyle = new GUIStyle(GUI.skin.label);
+        headerStyle.fontSize = 14;
+        headerStyle.fontStyle = FontStyle.Bold;
+        headerStyle.normal.textColor = new Color(0.9f, 0.85f, 1f);
+        headerStyle.alignment = TextAnchor.MiddleCenter;
+        
+        labelStyle = new GUIStyle(GUI.skin.label);
+        labelStyle.fontSize = 10;
+        labelStyle.normal.textColor = new Color(0.8f, 0.8f, 0.9f);
+        labelStyle.richText = true;
+        
+        buttonStyle = new GUIStyle(GUI.skin.button);
+        buttonStyle.fontSize = 10;
+        buttonStyle.fontStyle = FontStyle.Bold;
+        buttonStyle.normal.background = subtleBg;
+        buttonStyle.hover.background = subtleHover;
+        buttonStyle.active.background = accentBg;
+        buttonStyle.normal.textColor = Color.white;
+        buttonStyle.hover.textColor = Color.white;
+        buttonStyle.active.textColor = Color.white;
+        buttonStyle.padding = new RectOffset(8, 8, 6, 6);
+        
+        scoreStyle = new GUIStyle(GUI.skin.label);
+        scoreStyle.fontSize = 18;
+        scoreStyle.fontStyle = FontStyle.Bold;
+        scoreStyle.normal.textColor = Color.white;
+        scoreStyle.alignment = TextAnchor.MiddleCenter;
+        
+        comboStyle = new GUIStyle(GUI.skin.label);
+        comboStyle.fontSize = 12;
+        comboStyle.fontStyle = FontStyle.Bold;
+        comboStyle.normal.textColor = new Color(1f, 0.84f, 0f);
+        comboStyle.alignment = TextAnchor.MiddleCenter;
+        
+        sectionLabelStyle = new GUIStyle(GUI.skin.label);
+        sectionLabelStyle.fontSize = 10;
+        sectionLabelStyle.normal.textColor = new Color(0.6f, 0.8f, 1f);
+        sectionLabelStyle.alignment = TextAnchor.MiddleCenter;
+        
+        judgementStyle = new GUIStyle(GUI.skin.label);
+        judgementStyle.fontSize = 16;
+        judgementStyle.fontStyle = FontStyle.Bold;
+        judgementStyle.alignment = TextAnchor.MiddleCenter;
+    }
+    
+    private void DrawPlacementUI()
+    {
+        float panelW = 200f;
+        float panelH = 340f;
+        GUILayout.BeginArea(new Rect(10, 10, panelW, panelH), hudBoxStyle);
+        
+        GUILayout.Label("🎵 ORCHESTRA SETUP", headerStyle);
+        GUILayout.Space(6);
+        
+        // Status line
+        int placedCount = sectionPlacedMember.Count;
+        GUILayout.Label($"Placed: {placedCount}/4 sections", labelStyle);
+        
+        // Section placement status dots
+        GUILayout.BeginHorizontal();
+        for (int i = 0; i < 4; i++)
+        {
+            OrchestraSection sec = (OrchestraSection)i;
+            bool placed = sectionPlacedMember.ContainsKey(sec);
+            string dot = placed ? "<color=#44FF88>●</color>" : "<color=#555555>○</color>";
+            GUILayout.Label($"{dot} {sec}", labelStyle, GUILayout.Width(45));
+        }
+        GUILayout.EndHorizontal();
+        
+        GUILayout.Space(8);
+        
+        // Current selection
         string currentName = "None";
-        string sectionInfo = "";
+        string secName = "";
         if (orchestraPrefabs != null && orchestraPrefabs.Length > 0 && orchestraPrefabs[selectedIndex] != null)
         {
             currentName = orchestraPrefabs[selectedIndex].name;
             OrchestraSection sec = GetSectionForPrefab(selectedIndex);
             bool alreadyPlaced = sectionPlacedMember.ContainsKey(sec);
-            sectionInfo = $" [{sec}]" + (alreadyPlaced ? " (placed)" : "");
+            secName = $"[{sec}]" + (alreadyPlaced ? " ✓" : "");
         }
-        GUILayout.Label($"  {selectedIndex + 1}/{orchestraPrefabs?.Length ?? 0}: {currentName}{sectionInfo}");
+        GUILayout.Label($"Selected: {currentName}", labelStyle);
+        GUILayout.Label($"  {selectedIndex + 1}/{orchestraPrefabs?.Length ?? 0}  {secName}", labelStyle);
         
+        GUILayout.Space(4);
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("< Prev")) SelectPreviousMember();
-        if (GUILayout.Button("Next >")) SelectNextMember();
+        if (GUILayout.Button("◀ Prev", buttonStyle)) SelectPreviousMember();
+        if (GUILayout.Button("Next ▶", buttonStyle)) SelectNextMember();
         GUILayout.EndHorizontal();
         
-        GUILayout.Space(10);
+        GUILayout.Space(8);
         
-        // Actions
-        if (GUILayout.Button("Undo Last"))
+        if (GUILayout.Button("↩ Undo Last", buttonStyle))
             UndoLastPlacement();
-        
-        if (GUILayout.Button("Clear All"))
+        if (GUILayout.Button("✕ Clear All", buttonStyle))
             ClearAllPlacements();
         
-        if (GUILayout.Button("Toggle Planes"))
-            TogglePlaneVisibility();
+        GUILayout.Space(8);
         
-        GUILayout.Space(10);
+        // Lock button — highlight if all 4 placed
+        GUI.enabled = placedCount > 0;
+        string lockLabel = placedCount >= 4 ? "✔ START GAME" : $"Lock ({placedCount}/4 placed)";
+        if (GUILayout.Button(lockLabel, buttonStyle, GUILayout.Height(30)))
+            LockPlacements();
+        GUI.enabled = true;
         
-        if (isPlacementMode)
-        {
-            if (GUILayout.Button("DONE - Lock Placements"))
-                LockPlacements();
-        }
-        else
-        {
-            if (GUILayout.Button("Unlock & Edit"))
-                UnlockPlacements();
-        }
-        
-        GUILayout.Space(10);
-        GUILayout.Label("<i>Tap anywhere on a\ndetected plane to\nplace a member</i>");
+        GUILayout.Space(4);
+        GUILayout.Label("<i>Tap a plane to place</i>", labelStyle);
         
         GUILayout.EndArea();
+    }
+    
+    private void DrawGameplayHUD()
+    {
+        float hudW = 160f;
+        float hudH = 100f;
+        
+        // Top-center: Score + Combo
+        float centerX = (Screen.width / 3f - hudW) / 2f; // account for 3x GUI scale
+        GUILayout.BeginArea(new Rect(centerX, 8, hudW, hudH), hudBoxStyle);
+        
+        int score = RhythmGameController.Instance?.TotalScore ?? 0;
+        int combo = RhythmGameController.Instance?.Combo ?? 0;
+        
+        GUILayout.Label(score.ToString("N0"), scoreStyle);
+        
+        if (combo > 1)
+        {
+            GUILayout.Label($"{combo}x COMBO", comboStyle);
+        }
+        
+        // Current target section
+        string sectionName = RhythmGameController.Instance?.SelectedSection.ToString() ?? "---";
+        GUILayout.Label($"▸ {sectionName}", sectionLabelStyle);
+        
+        GUILayout.EndArea();
+        
+        // Center: Judgement feedback (floating)
+        if (judgementTimer > 0)
+        {
+            float alpha = Mathf.Clamp01(judgementTimer / 0.3f); // fade out in last 0.3s
+            Color col = lastJudgementColor;
+            col.a = alpha;
+            judgementStyle.normal.textColor = col;
+            
+            float jW = 200f;
+            float jH = 40f;
+            float jX = (Screen.width / 3f - jW) / 2f;
+            float jY = Screen.height / 3f * 0.35f; // upper third
+            GUI.Label(new Rect(jX, jY, jW, jH), lastJudgement, judgementStyle);
+        }
+        
+        // Bottom-left: small unlock button
+        if (GUI.Button(new Rect(10, Screen.height / 3f - 35, 70, 22), "✎ Edit", buttonStyle))
+        {
+            UnlockPlacements();
+        }
     }
 }
 
