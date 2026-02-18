@@ -12,7 +12,7 @@ namespace OrchestraMaestro
         [Header("Display Settings")]
         [SerializeField] private int maxMessages = 15;
         [SerializeField] private int fontSize = 24;
-        [SerializeField] private bool showOnStart = true;
+        [SerializeField] private bool showOnStart = false;
         
         private List<string> logMessages = new List<string>();
         private bool isVisible = true;
@@ -32,7 +32,7 @@ namespace OrchestraMaestro
             instance = this;
             DontDestroyOnLoad(gameObject);
             
-            isVisible = showOnStart;
+            isVisible = false; // Always start hidden
             Application.logMessageReceived += HandleLog;
         }
 
@@ -92,14 +92,14 @@ namespace OrchestraMaestro
                 isVisible = !isVisible;
             }
             
-            // Clear button
+            if (!isVisible) return;
+            
+            // Clear button (only visible when log is shown)
             Rect clearRect = new Rect(170, scaledHeight - 70, 150, 60);
             if (GUI.Button(clearRect, "Clear", buttonStyle))
             {
                 logMessages.Clear();
             }
-            
-            if (!isVisible) return;
             
             // Log panel (bottom half of screen)
             float panelHeight = scaledHeight * 0.4f;

@@ -598,13 +598,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cueRadarPrefab: {fileID: 0}
   radarDistance: 0
-  radarHeight: 1
+  radarHeight: 0.7
   radarScale: 70
   cueLeadTime: 2
   orchestraPlacement: {fileID: 1141421495}
   rhythmMap: {fileID: 164925909}
   use3DRadar: 1
-  radar3DSize: 0.4
+  radar3DSize: 0.2
 --- !u!114 &164925911
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -619,7 +619,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxMessages: 15
   fontSize: 24
-  showOnStart: 1
+  showOnStart: 0
 --- !u!1 &176225537
 GameObject:
   m_ObjectHideFlags: 0
@@ -2111,7 +2111,7 @@ MonoBehaviour:
   raycastManager: {fileID: 694946837}
   planeManager: {fileID: 694946836}
   orchestraPrefabs:
-  - {fileID: 15783401880030581, guid: b36c908727f4beb8996a157c86759fb8, type: 3}
+  - {fileID: 7975573438871059184, guid: b36c908727f4beb8996a157c86759fb8, type: 3}
   - {fileID: 6776518572987138601, guid: cf1afb4816098ae8b9f9410a275fcdf8, type: 3}
   - {fileID: 2452762725993195741, guid: d568dbd2e15af3bfa8ac16384dde8608, type: 3}
   - {fileID: 2699246951506681812, guid: e8c3008f0c604b681bbc389d8f3a86ab, type: 3}
@@ -2123,6 +2123,7 @@ MonoBehaviour:
   highlightIntensity: 2
   feedbackDuration: 0.5
   prefabScale: 0.5
+  selectorHaloPrefab: {fileID: 1836678590729647471, guid: ca9c1319baec7c12ea1b3d3cdd508795, type: 3}
 --- !u!4 &1141421496
 Transform:
   m_ObjectHideFlags: 0

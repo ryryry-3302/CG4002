@@ -95,21 +95,10 @@ namespace OrchestraMaestro
             // Apply scaling for mobile
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * panelScale);
             
-            // Always show toggle button in top-right corner
-            Rect toggleRect = new Rect(
-                (Screen.width / panelScale) - toggleButtonSize - 5,
-                5,
-                toggleButtonSize,
-                toggleButtonSize
-            );
-            
-            string toggleLabel = showPanel ? "Hide\nDebug" : "Show\nDebug";
-            if (GUI.Button(toggleRect, toggleLabel))
-            {
-                showPanel = !showPanel;
-            }
-            
-            if (!showPanel) return;
+            // Panel always shown for dummy input testing
+            showPanel = true;
+            // ...existing code...
+            // No toggle or hide logic
             
             // Recalculate rect for scaled coordinates
             float scaledPanelWidth = buttonWidth * 3 + padding * 4;
