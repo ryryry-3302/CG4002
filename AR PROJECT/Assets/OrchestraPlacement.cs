@@ -775,7 +775,7 @@ public class OrchestraPlacement : MonoBehaviour
     
     private void DrawPlacementUI()
     {
-        float panelW = 200f;
+        float panelW = 300f;
         float panelH = 380f;
         GUILayout.BeginArea(new Rect(10, 10, panelW, panelH), hudBoxStyle);
         
@@ -798,7 +798,7 @@ public class OrchestraPlacement : MonoBehaviour
             OrchestraSection sec = (OrchestraSection)i;
             bool placed = sectionPlacedMember.ContainsKey(sec);
             string dot = placed ? "<color=#44FF88>●</color>" : "<color=#555555>○</color>";
-            GUILayout.Label($"{dot} {sec}", labelStyle, GUILayout.Width(45));
+            GUILayout.Label($"{dot} {sec}", labelStyle);
         }
         GUILayout.EndHorizontal();
         

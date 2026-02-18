@@ -435,6 +435,11 @@ namespace OrchestraMaestro
         /// <summary>Hide all HUD elements (for returning to placement mode)</summary>
         public void HideAll()
         {
+            // Disable the entire Canvas to prevent any Canvas UI from rendering
+            // (OnGUI in OrchestraPlacement handles all HUD rendering)
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas != null) canvas.enabled = false;
+            
             if (playingUI != null) playingUI.SetActive(false);
             if (resultsUI != null) resultsUI.SetActive(false);
             HideJudgement();
