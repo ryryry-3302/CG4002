@@ -81,6 +81,20 @@ namespace OrchestraMaestro
         }
 
         /// <summary>
+        /// Load rhythm map from a TextAsset containing JSON.
+        /// </summary>
+        public void LoadFromAsset(TextAsset jsonAsset)
+        {
+            if (jsonAsset == null)
+            {
+                Debug.LogError("[RhythmMap] Cannot load from null TextAsset");
+                return;
+            }
+            LoadFromJson(jsonAsset.text);
+        }
+
+
+        /// <summary>
         /// Load a test/demo rhythm map for development.
         /// One cue at a time, cycling through sections. Only UP, DOWN, PUNCH gestures.
         /// </summary>

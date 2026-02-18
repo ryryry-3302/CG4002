@@ -1,0 +1,209 @@
+{
+  "cues": [
+    {
+      "timestamp": 0.07,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 4.39,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 8.52,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 12.79,
+      "gestureId": "UP",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 16.9,
+      "gestureId": "DOWN",
+      "section": "flute"
+    },
+    {
+      "timestamp": 21.06,
+      "gestureId": "PUNCH",
+      "section": "drum"
+    },
+    {
+      "timestamp": 25.08,
+      "gestureId": "UP",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 29.26,
+      "gestureId": "DOWN",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 33.67,
+      "gestureId": "PUNCH",
+      "section": "flute"
+    },
+    {
+      "timestamp": 37.89,
+      "gestureId": "UP",
+      "section": "drum"
+    },
+    {
+      "timestamp": 42.05,
+      "gestureId": "DOWN",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 46.28,
+      "gestureId": "PUNCH",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 50.48,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 54.68,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 58.86,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 63.07,
+      "gestureId": "UP",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 67.27,
+      "gestureId": "DOWN",
+      "section": "flute"
+    },
+    {
+      "timestamp": 71.47,
+      "gestureId": "PUNCH",
+      "section": "drum"
+    },
+    {
+      "timestamp": 75.67,
+      "gestureId": "UP",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 79.88,
+      "gestureId": "DOWN",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 84.08,
+      "gestureId": "PUNCH",
+      "section": "flute"
+    },
+    {
+      "timestamp": 88.28,
+      "gestureId": "UP",
+      "section": "drum"
+    },
+    {
+      "timestamp": 92.46,
+      "gestureId": "DOWN",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 96.69,
+      "gestureId": "PUNCH",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 100.87,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 105.07,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 109.27,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 113.48,
+      "gestureId": "UP",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 117.66,
+      "gestureId": "DOWN",
+      "section": "flute"
+    },
+    {
+      "timestamp": 121.86,
+      "gestureId": "PUNCH",
+      "section": "drum"
+    },
+    {
+      "timestamp": 126.06,
+      "gestureId": "UP",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 130.26,
+      "gestureId": "DOWN",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 134.47,
+      "gestureId": "PUNCH",
+      "section": "flute"
+    },
+    {
+      "timestamp": 138.48,
+      "gestureId": "UP",
+      "section": "drum"
+    },
+    {
+      "timestamp": 142.66,
+      "gestureId": "DOWN",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 146.87,
+      "gestureId": "PUNCH",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 150.88,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 155.48,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 159.66,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 163.68,
+      "gestureId": "UP",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 168.07,
+      "gestureId": "DOWN",
+      "section": "flute"
+    }
+  ]
+}

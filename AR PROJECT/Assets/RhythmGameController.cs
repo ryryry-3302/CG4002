@@ -15,6 +15,10 @@ namespace OrchestraMaestro
         [SerializeField] private OrchestraPlacement orchestraPlacement;
         [SerializeField] private HUDController hudController;
 
+        [Header("Song Configuration")]
+        [SerializeField] private SongData currentSong;
+        [SerializeField] private AudioSource audioSource;
+
         [Header("Game Settings")]
         [SerializeField] private bool autoStartTestMap = true;
 
@@ -140,10 +144,45 @@ namespace OrchestraMaestro
         }
 
         /// <summary>Start the game with the currently loaded rhythm map</summary>
+        /// <summary>Start the game with the currently loaded rhythm map</summary>
         public void StartGame()
         {
             ResetScore();
             selectedSectionIndex = 0;
+            
+            // Load song data if available
+            if (currentSong != null)
+            {
+                Debug.Log($"[RhythmGameController] Loading song: {currentSong.songName}");
+                
+                // Load map
+                if (currentSong.rhythmMapJson != null)
+                {
+                    rhythmMap.LoadFromAsset(currentSong.rhythmMapJson);
+                }
+                else
+                {
+                    Debug.LogWarning("[RhythmGameController] Song has no rhythm map! Using default test map.");
+                    rhythmMap.LoadTestMap();
+                }
+
+                // Prepare audio
+                if (audioSource != null && currentSong.audioClip != null)
+                {
+                    audioSource.clip = currentSong.audioClip;
+                    audioSource.Play();
+                    Debug.Log($"[RhythmGameController] Playing audio: {currentSong.audioClip.name}");
+                }
+                else
+                {
+                    Debug.LogWarning("[RhythmGameController] Missing AudioSource or AudioClip!");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[RhythmGameController] No SongData assigned! Using default test map.");
+                rhythmMap.LoadTestMap();
+            }
             
             rhythmMap.StartPlayback();
             SetGameState(GameState.Playing);
@@ -152,27 +191,40 @@ namespace OrchestraMaestro
         }
 
         /// <summary>Pause the game</summary>
+        /// <summary>Pause the game</summary>
         public void PauseGame()
         {
             if (currentState != GameState.Playing) return;
 
             rhythmMap.PausePlayback();
+            if (audioSource != null) audioSource.Pause();
+            
             SetGameState(GameState.Paused);
         }
 
+        /// <summary>Resume from pause</summary>
         /// <summary>Resume from pause</summary>
         public void ResumeGame()
         {
             if (currentState != GameState.Paused) return;
 
             rhythmMap.StartPlayback();
+            if (audioSource != null) audioSource.UnPause();
+            
             SetGameState(GameState.Playing);
         }
 
         /// <summary>End the game and show results</summary>
+        /// <summary>End the game and show results</summary>
         public void EndGame()
         {
             rhythmMap.StopPlayback();
+            
+            if (audioSource != null && audioSource.isPlaying)
+            {
+                audioSource.Stop();
+            }
+
             SetGameState(GameState.Results);
 
             Debug.Log($"[RhythmGameController] Game ended! Score: {totalScore}, Max Combo: {maxCombo}");
@@ -325,6 +377,15 @@ namespace OrchestraMaestro
             
             StartTestGame();
         }
+
+        /// <summary>
+        /// Set the song to play (called from menu or inspector).
+        /// </summary>
+        public void SetSong(SongData song)
+        {
+            currentSong = song;
+        }
+
 
         #endregion
 
