@@ -46,6 +46,35 @@ namespace OrchestraMaestro
         
         // Singleton
         public static CueRadarManager Instance { get; private set; }
+        
+        /// <summary>Get the currently active gesture name, section, and timing color (for HUD display)</summary>
+        public (string gestureName, string sectionName, Color timingColor) GetCurrentActiveGesture()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                if (activeCues[i].HasValue)
+                {
+                    var cue = activeCues[i].Value;
+                    string gesture = cue.gestureType switch
+                    {
+                        GestureType.UP => "↑ UP",
+                        GestureType.DOWN => "↓ DOWN",
+                        GestureType.LEFT => "← LEFT",
+                        GestureType.RIGHT => "→ RIGHT",
+                        GestureType.PUNCH => "👊 PUNCH",
+                        _ => cue.gestureType.ToString()
+                    };
+                    
+                    // Get timing color from the active radar
+                    Color color = Color.white;
+                    if (radars3D[i] != null)
+                        color = radars3D[i].CurrentTimingColor;
+                    
+                    return (gesture, cue.targetSection.ToString(), color);
+                }
+            }
+            return (null, null, Color.white);
+        }
 
         #region Unity Lifecycle
 
@@ -345,7 +374,7 @@ namespace OrchestraMaestro
                 {
                     // Position radar in front of and above the section
                     Vector3 toCamera = (Camera.main.transform.position - sectionPos.Value).normalized;
-                    Vector3 finalPos = sectionPos.Value + toCamera * radarDistance + Vector3.up * radarHeight;
+                    Vector3 finalPos = sectionPos.Value + toCamera * radarDistance + Vector3.up * (radarHeight * 0.75f);
                     Debug.Log($"[CueRadarManager] GetRadarPosition({section}): sectionPos={sectionPos.Value}, finalPos={finalPos}");
                     return finalPos;
                 }

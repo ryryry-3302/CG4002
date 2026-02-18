@@ -1,5 +1,4 @@
 using UnityEngine;
-using TMPro;
 
 namespace OrchestraMaestro
 {
@@ -12,16 +11,6 @@ namespace OrchestraMaestro
         [Header("Visual Components")]
         [SerializeField] private SpriteRenderer backgroundSprite;
         [SerializeField] private SpriteRenderer ringSprite;
-        [SerializeField] private TextMeshPro gestureText;
-        
-        [Header("Colors")]
-        [SerializeField] private Color farColor = Color.white;
-        [SerializeField] private Color readyColor = Color.green;
-        [SerializeField] private Color closeColor = Color.yellow;
-        [SerializeField] private Color urgentColor = Color.red;
-        [SerializeField] private Color perfectColor = new Color(0f, 1f, 0.5f);
-        [SerializeField] private Color goodColor = new Color(1f, 0.9f, 0f);
-        [SerializeField] private Color missColor = new Color(1f, 0.2f, 0.2f);
         
         [Header("Timing Thresholds")]
         [SerializeField] private float readyThreshold = 1.5f;
@@ -35,6 +24,10 @@ namespace OrchestraMaestro
         private bool isActive = false;
         private float totalTime = 0f;
         private GestureType currentGesture;
+        
+        // Current timing color (exposed for HUD to read)
+        private Color currentTimingColor = Color.red;
+        public Color CurrentTimingColor => currentTimingColor;
         
         public bool IsActive => isActive;
 
@@ -77,26 +70,12 @@ namespace OrchestraMaestro
             
             Renderer ringRenderer = ringObj.GetComponent<Renderer>();
             ringRenderer.material = new Material(Shader.Find("Sprites/Default"));
-            ringRenderer.material.color = farColor;
+            ringRenderer.material.color = Color.red;
             
             // Store ring reference for animation
             ringTransform = ringObj.transform;
             ringMaterial = ringRenderer.material;
             baseSize = size;
-            
-            // Create text
-            GameObject textObj = new GameObject("GestureText");
-            textObj.transform.SetParent(transform, false);
-            textObj.transform.localPosition = new Vector3(0, 0, -0.02f);
-            
-            gestureText = textObj.AddComponent<TextMeshPro>();
-            gestureText.text = "?";
-            gestureText.fontSize = 4;
-            gestureText.alignment = TextAlignmentOptions.Center;
-            gestureText.color = Color.white;
-            
-            RectTransform textRect = gestureText.GetComponent<RectTransform>();
-            textRect.sizeDelta = new Vector2(size, size);
         }
 
         private Transform ringTransform;
@@ -108,12 +87,7 @@ namespace OrchestraMaestro
             currentGesture = gesture;
             totalTime = timeUntilHit;
             isActive = true;
-            
-            // Set gesture text
-            if (gestureText != null)
-            {
-                gestureText.text = GetGestureText(gesture);
-            }
+            currentTimingColor = Color.red;
             
             // Reset ring
             if (ringTransform != null)
@@ -122,7 +96,7 @@ namespace OrchestraMaestro
             }
             if (ringMaterial != null)
             {
-                ringMaterial.color = farColor;
+                ringMaterial.color = Color.red;
             }
             
             gameObject.SetActive(true);
@@ -135,17 +109,18 @@ namespace OrchestraMaestro
             
             // Animate ring scale
             float progress = Mathf.Clamp01(remaining / totalTime);
-            float scale = Mathf.Lerp(minRingScale, maxRingScale, progress);
+            float scale = Mathf.Lerp(maxRingScale, minRingScale, progress); // Sinks toward character as time passes
             
             if (ringTransform != null)
             {
                 ringTransform.localScale = Vector3.one * baseSize * scale;
             }
             
-            // Animate ring color
+            // Animate ring color: red → yellow → green (perfect) → dark green (late)
+            currentTimingColor = GetColorForTime(remaining);
             if (ringMaterial != null)
             {
-                ringMaterial.color = GetColorForTime(remaining);
+                ringMaterial.color = currentTimingColor;
             }
         }
 
@@ -153,11 +128,12 @@ namespace OrchestraMaestro
         {
             Color resultColor = judgement switch
             {
-                JudgementType.Perfect => perfectColor,
-                JudgementType.Good => goodColor,
-                _ => missColor
+                JudgementType.Perfect => new Color(0f, 1f, 0.5f),
+                JudgementType.Good => new Color(1f, 0.9f, 0f),
+                _ => new Color(1f, 0.2f, 0.2f)
             };
             
+            currentTimingColor = resultColor;
             if (ringMaterial != null)
             {
                 ringMaterial.color = resultColor;
@@ -175,29 +151,36 @@ namespace OrchestraMaestro
 
         private Color GetColorForTime(float remaining)
         {
-            if (remaining > readyThreshold) return farColor;
-            if (remaining > closeThreshold) return Color.Lerp(readyColor, farColor, (remaining - closeThreshold) / (readyThreshold - closeThreshold));
-            if (remaining > urgentThreshold) return Color.Lerp(closeColor, readyColor, (remaining - urgentThreshold) / (closeThreshold - urgentThreshold));
-            return Color.Lerp(urgentColor, closeColor, remaining / urgentThreshold);
-        }
-
-        private string GetGestureText(GestureType gesture)
-        {
-            return gesture switch
+            // Color progression: red (far) → yellow (getting closer) → green (perfect window) → dark green (late)
+            Color red = new Color(0.9f, 0.2f, 0.2f);
+            Color yellow = new Color(1f, 0.85f, 0.1f);
+            Color green = new Color(0.1f, 0.9f, 0.3f);
+            Color darkGreen = new Color(0.05f, 0.4f, 0.15f);
+            
+            if (remaining < 0f)
             {
-                GestureType.UP => "UP",
-                GestureType.DOWN => "DN",
-                GestureType.LEFT => "LT",
-                GestureType.RIGHT => "RT",
-                GestureType.PUNCH => "HIT",
-                GestureType.WITHDRAW => "OUT",
-                GestureType.V_SHAPE => "V",
-                GestureType.LAMBDA_SHAPE => "^",
-                GestureType.TRIANGLE => "TRI",
-                GestureType.CIRCLE => "O",
-                GestureType.S_SHAPE => "S",
-                _ => "?"
-            };
+                // Late — dark green fading
+                float lateness = Mathf.Clamp01(-remaining / 0.5f);
+                return Color.Lerp(green, darkGreen, lateness);
+            }
+            if (remaining > readyThreshold)
+            {
+                return red;
+            }
+            if (remaining > closeThreshold)
+            {
+                // red → yellow
+                float t = 1f - (remaining - closeThreshold) / (readyThreshold - closeThreshold);
+                return Color.Lerp(red, yellow, t);
+            }
+            if (remaining > urgentThreshold)
+            {
+                // yellow → green
+                float t = 1f - (remaining - urgentThreshold) / (closeThreshold - urgentThreshold);
+                return Color.Lerp(yellow, green, t);
+            }
+            // urgentThreshold → 0: bright green (perfect zone)
+            return green;
         }
 
         private void Update()

@@ -65,6 +65,7 @@ public class OrchestraPlacement : MonoBehaviour
     private GUIStyle comboStyle;
     private GUIStyle scoreStyle;
     private GUIStyle hudBoxStyle;
+    private GUIStyle gesturePromptStyle;
     private bool stylesInitialized = false;
     
     // Persist textures so GC doesn't destroy them
@@ -153,6 +154,11 @@ public class OrchestraPlacement : MonoBehaviour
         }
     }
     
+    void LateUpdate()
+    {
+        UpdateSelectorHalo();
+    }
+    
     /// <summary>
     /// Check if a screen position (Input coordinates, origin bottom-left) is inside the OnGUI panel.
     /// OnGUI uses top-left origin and is scaled by GUI.matrix (3x), so we convert.
@@ -218,7 +224,7 @@ public class OrchestraPlacement : MonoBehaviour
         
         GameObject member = Instantiate(prefab, finalPosition, finalRotation);
         // Use the scale specified in the prefab instead of the script override
-        member.transform.localScale = prefab.transform.localScale;
+        member.transform.localScale = prefab.transform.localScale * 0.75f;
         
         // Correct for off-center mesh geometry in FBX models:
         // Calculate the visual center offset from the renderers' bounds and shift the object
@@ -771,8 +777,62 @@ public class OrchestraPlacement : MonoBehaviour
         judgementStyle.fontSize = 16;
         judgementStyle.fontStyle = FontStyle.Bold;
         judgementStyle.alignment = TextAnchor.MiddleCenter;
+        
+        gesturePromptStyle = new GUIStyle(GUI.skin.label);
+        gesturePromptStyle.fontSize = 13;
+        gesturePromptStyle.fontStyle = FontStyle.Bold;
+        gesturePromptStyle.normal.textColor = new Color(1f, 0.95f, 0.6f);
+        gesturePromptStyle.alignment = TextAnchor.MiddleCenter;
     }
     
+    [Header("Selector Halo")]
+    [Tooltip("Prefab for the glowing selector halo under the selected member")]
+    [SerializeField] private GameObject selectorHaloPrefab;
+    
+    private GameObject selectorHaloInstance;
+
+    private void UpdateSelectorHalo()
+    {
+        // Only show halo during the active game (not placement mode)
+        var gameState = RhythmGameController.Instance?.CurrentState ?? RhythmGameController.GameState.Setup;
+        if (gameState != RhythmGameController.GameState.Playing || selectorHaloPrefab == null)
+        {
+            if (selectorHaloInstance != null) selectorHaloInstance.SetActive(false);
+            return;
+        }
+        // Find the currently selected section and its member
+        OrchestraSection section = RhythmGameController.Instance.SelectedSection;
+        GameObject selectedMember = null;
+        sectionPlacedMember.TryGetValue(section, out selectedMember);
+        if (selectedMember == null)
+        {
+            if (selectorHaloInstance != null) selectorHaloInstance.SetActive(false);
+            return;
+        }
+        if (selectorHaloInstance == null)
+        {
+            selectorHaloInstance = Instantiate(selectorHaloPrefab);
+            selectorHaloInstance.name = "SelectorHaloInstance";
+        }
+        selectorHaloInstance.SetActive(true);
+        // Use renderer bounds center for robust centering (like radar)
+        Renderer[] renderers = selectedMember.GetComponentsInChildren<Renderer>();
+        Vector3 haloPos = selectedMember.transform.position;
+        if (renderers.Length > 0) {
+            Bounds combinedBounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+                combinedBounds.Encapsulate(renderers[i].bounds);
+            haloPos = combinedBounds.center;
+            haloPos.y = selectedMember.transform.position.y;
+        }
+        selectorHaloInstance.transform.position = haloPos + Vector3.down * 0.01f;
+        selectorHaloInstance.transform.rotation = Quaternion.identity;
+        selectorHaloInstance.transform.localScale = new Vector3(
+            selectedMember.transform.localScale.x * 0.15f,
+            selectorHaloInstance.transform.localScale.y,
+            selectedMember.transform.localScale.z * 0.15f);
+    }
+
     private void DrawPlacementUI()
     {
         float panelW = 300f;
@@ -859,7 +919,7 @@ public class OrchestraPlacement : MonoBehaviour
         }
         
         float hudW = 160f;
-        float hudH = 100f;
+        float hudH = 155f;
         
         // Top-center: Score + Combo
         float centerX = (Screen.width / 3f - hudW) / 2f; // account for 3x GUI scale
@@ -878,6 +938,19 @@ public class OrchestraPlacement : MonoBehaviour
         // Current target section
         string sectionName = RhythmGameController.Instance?.SelectedSection.ToString() ?? "---";
         GUILayout.Label($"▸ {sectionName}", sectionLabelStyle);
+        
+        // Incoming gesture name with timing color + section in brackets
+        var cueInfo = CueRadarManager.Instance?.GetCurrentActiveGesture() ?? (null, null, Color.white);
+        if (cueInfo.gestureName != null)
+        {
+            gesturePromptStyle.normal.textColor = cueInfo.timingColor;
+            GUILayout.Label(cueInfo.gestureName, gesturePromptStyle);
+            
+            sectionLabelStyle.normal.textColor = cueInfo.timingColor;
+            GUILayout.Label($"[{cueInfo.sectionName}]", sectionLabelStyle);
+            // Reset section label color
+            sectionLabelStyle.normal.textColor = new Color(0.6f, 0.8f, 1f);
+        }
         
         GUILayout.EndArea();
         
