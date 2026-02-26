@@ -1,9 +1,11 @@
+using System.Collections;
 using UnityEngine;
 using OrchestraMaestro;
 
 /// <summary>
 /// Manages sparkle trail particle effects that follow the tracked baton tip.
 /// Emission scales with baton movement speed; triggers gesture-specific bursts on judgement.
+/// On successful gestures, a sparkle flies from the baton to the target orchestra member.
 /// </summary>
 [RequireComponent(typeof(BatonTracker))]
 public class BatonSparkleEffect : MonoBehaviour
@@ -16,6 +18,10 @@ public class BatonSparkleEffect : MonoBehaviour
     [SerializeField] private float movementEmissionScale = 80f;
     [SerializeField] private float minEmissionWhenTracking = 8f;
     [SerializeField] private float fadeOutSpeed = 4f;
+
+    private const float FlyingSparkleDuration = 1.2f;
+    private const float FlyingSparkleTrailLength = 0.4f;
+    private const int ArrivalExplosionCount = 60;
 
     private ParticleSystem sparkleParticles;
     private ParticleSystem burstParticles;
@@ -267,6 +273,129 @@ public class BatonSparkleEffect : MonoBehaviour
         colorOverLifetime.color = grad;
 
         burstParticles.Play(true);
+
+        // Flying sparkle to orchestra member on success
+        if ((result.judgement == JudgementType.Perfect || result.judgement == JudgementType.Good)
+            && OrchestraPlacement.Instance != null)
+        {
+            Vector3? targetPos = OrchestraPlacement.Instance.GetSectionCenterOfMass(result.targetSection);
+            if (targetPos.HasValue)
+                StartCoroutine(SpawnFlyingSparkle(pos, targetPos.Value, result.judgement));
+        }
+    }
+
+    private IEnumerator SpawnFlyingSparkle(Vector3 from, Vector3 to, JudgementType judgement)
+    {
+        Vector3 dir = (to - from);
+        float dist = dir.magnitude;
+        if (dist < 0.01f) yield break;
+        dir /= dist;
+
+        Color sparkleColor = judgement == JudgementType.Perfect
+            ? new Color(1f, 0.9f, 0.4f)
+            : new Color(1f, 1f, 0.95f);
+
+        var go = new GameObject("FlyingSparkle");
+        go.transform.position = from;
+
+        var trail = go.AddComponent<TrailRenderer>();
+        trail.time = FlyingSparkleTrailLength;
+        trail.startWidth = 0.04f;
+        trail.endWidth = 0.002f;
+        trail.material = GetDefaultParticleMaterial();
+        trail.startColor = sparkleColor;
+        trail.endColor = new Color(sparkleColor.r, sparkleColor.g, sparkleColor.b, 0f);
+        trail.autodestruct = false;
+        trail.emitting = true;
+
+        // Glow at the head - small particle system that follows
+        var headPs = go.AddComponent<ParticleSystem>();
+        var main = headPs.main;
+        main.duration = 0.1f;
+        main.loop = true;
+        main.startLifetime = 0.15f;
+        main.startSize = 0.025f;
+        main.startColor = sparkleColor;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.playOnAwake = true;
+        var headEmission = headPs.emission;
+        headEmission.rateOverTime = 80f;
+        var headShape = headPs.shape;
+        headShape.shapeType = ParticleSystemShapeType.Sphere;
+        headShape.radius = 0.005f;
+        var headRenderer = headPs.GetComponent<ParticleSystemRenderer>();
+        if (headRenderer != null)
+        {
+            headRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+            headRenderer.material = GetDefaultParticleMaterial();
+        }
+
+        float elapsed = 0f;
+        while (elapsed < FlyingSparkleDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / FlyingSparkleDuration;
+            t = t * t * (3f - 2f * t); // smoothstep - ease in and out
+            go.transform.position = Vector3.Lerp(from, to, t);
+            yield return null;
+        }
+
+        go.transform.position = to;
+        trail.emitting = false;
+
+        // Explosion at arrival
+        SpawnArrivalExplosion(to, sparkleColor);
+
+        yield return new WaitForSeconds(FlyingSparkleTrailLength);
+        Destroy(go);
+    }
+
+    private void SpawnArrivalExplosion(Vector3 position, Color color)
+    {
+        var go = new GameObject("ArrivalExplosion");
+        go.transform.position = position;
+
+        var ps = go.AddComponent<ParticleSystem>();
+        var main = ps.main;
+        main.duration = 0.3f;
+        main.loop = false;
+        main.startLifetime = 0.5f;
+        main.startSpeed = 0.15f;
+        main.startSize = 0.02f;
+        main.startColor = color;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.playOnAwake = false;
+
+        var emission = ps.emission;
+        emission.rateOverTime = 0;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, ArrivalExplosionCount) });
+
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.02f;
+
+        var colorOverLifetime = ps.colorOverLifetime;
+        colorOverLifetime.enabled = true;
+        var grad = new Gradient();
+        grad.SetKeys(
+            new[] { new GradientColorKey(color, 0f), new GradientColorKey(color * 0.5f, 1f) },
+            new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0f, 1f) });
+        colorOverLifetime.color = grad;
+
+        var sizeOverLifetime = ps.sizeOverLifetime;
+        sizeOverLifetime.enabled = true;
+        sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(
+            new Keyframe(0f, 1f), new Keyframe(0.5f, 1.2f), new Keyframe(1f, 0f)));
+
+        var renderer = ps.GetComponent<ParticleSystemRenderer>();
+        if (renderer != null)
+        {
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.material = GetDefaultParticleMaterial();
+        }
+
+        ps.Play(true);
+        Destroy(go, 0.8f);
     }
 
     private void ApplyGestureTheme(GestureType gesture, ref ParticleSystem.MainModule main, ref ParticleSystem.EmissionModule emission)

@@ -680,6 +680,41 @@ public class OrchestraPlacement : MonoBehaviour
         
         return sum / count;
     }
+
+    /// <summary>Get the center of mass of a section (full 3D bounds center, for effects targeting the character body)</summary>
+    public Vector3? GetSectionCenterOfMass(OrchestraSection section)
+    {
+        List<GameObject> members = sectionMembers[(int)section];
+
+        if (members == null || members.Count == 0)
+            return null;
+
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+
+        foreach (var member in members)
+        {
+            if (member != null)
+            {
+                Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0)
+                {
+                    Bounds combinedBounds = renderers[0].bounds;
+                    for (int i = 1; i < renderers.Length; i++)
+                        combinedBounds.Encapsulate(renderers[i].bounds);
+                    sum += combinedBounds.center;
+                }
+                else
+                {
+                    sum += member.transform.position;
+                }
+                count++;
+            }
+        }
+
+        if (count == 0) return null;
+        return sum / count;
+    }
     
     /// <summary>Get all placed members</summary>
     public List<GameObject> GetAllMembers()
