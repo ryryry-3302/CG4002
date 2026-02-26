@@ -4,9 +4,11 @@ using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using Unity.Collections;
+using OrchestraMaestro;
 
 /// <summary>
 /// Tracks a fluorescent green baton in the AR camera feed using color detection.
+/// Only active during gameplay (Playing or Paused state).
 /// Uses flood-fill connected components to find distinct green blobs, then picks
 /// the largest elongated one as the baton.
 /// </summary>
@@ -43,6 +45,7 @@ public class BatonTracker : MonoBehaviour
     public bool IsTracking { get; private set; }
     public float TrackingConfidence { get; private set; }
 
+    private bool trackingEnabled;
     private Camera arCamera;
     private int frameCounter;
     private Vector2 smoothedScreenPos;
@@ -99,9 +102,37 @@ public class BatonTracker : MonoBehaviour
             arCamera = Camera.main;
     }
 
+    private void Start()
+    {
+        if (RhythmGameController.Instance != null)
+        {
+            RhythmGameController.Instance.OnGameStateChanged += OnGameStateChanged;
+            trackingEnabled = RhythmGameController.Instance.CurrentState == RhythmGameController.GameState.Playing
+                || RhythmGameController.Instance.CurrentState == RhythmGameController.GameState.Paused;
+        }
+        else
+        {
+            trackingEnabled = true;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (RhythmGameController.Instance != null)
+            RhythmGameController.Instance.OnGameStateChanged -= OnGameStateChanged;
+    }
+
+    private void OnGameStateChanged(RhythmGameController.GameState state)
+    {
+        trackingEnabled = state == RhythmGameController.GameState.Playing
+            || state == RhythmGameController.GameState.Paused;
+        if (!trackingEnabled)
+            IsTracking = false;
+    }
+
     private void Update()
     {
-        if (cameraManager == null || arCamera == null)
+        if (!trackingEnabled || cameraManager == null || arCamera == null)
         {
             IsTracking = false;
             return;
