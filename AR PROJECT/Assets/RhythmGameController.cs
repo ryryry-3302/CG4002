@@ -17,6 +17,7 @@ namespace OrchestraMaestro
 
         [Header("Song Configuration")]
         [SerializeField] private SongData currentSong;
+        [SerializeField] private SongData[] availableSongs;
         [SerializeField] private AudioSource audioSource;
 
         [Header("Game Settings")]
@@ -100,8 +101,8 @@ namespace OrchestraMaestro
 
         private void HandlePlacementsLocked()
         {
-            Debug.Log("[RhythmGameController] Placements locked - starting game!");
-            StartTestGame();
+            Debug.Log("[RhythmGameController] Placements locked - awaiting song selection");
+            // Game stays in Setup; song selection UI will call SelectSongAndStart when user picks
         }
 
         private void OnDestroy()
@@ -364,18 +365,19 @@ namespace OrchestraMaestro
             EndGame();
         }
         
-        /// <summary>Restart the game with the same map (keeps placements)</summary>
-        public void RestartGame()
+        /// <summary>Return to song selection (keeps placements). Called from Play Again.</summary>
+        public void ReturnToSongSelection()
         {
-            Debug.Log("[RhythmGameController] Restarting game...");
-            
-            // Reset cue radar manager
+            Debug.Log("[RhythmGameController] Returning to song selection...");
+
+            rhythmMap.StopPlayback();
+            if (audioSource != null && audioSource.isPlaying)
+                audioSource.Stop();
+
             if (CueRadarManager.Instance != null)
-            {
                 CueRadarManager.Instance.ResetForNewGame();
-            }
-            
-            StartTestGame();
+
+            SetGameState(GameState.Setup);
         }
 
         /// <summary>
@@ -385,6 +387,16 @@ namespace OrchestraMaestro
         {
             currentSong = song;
         }
+
+        /// <summary>Select a song and start the game. Called from song selection UI.</summary>
+        public void SelectSongAndStart(SongData song)
+        {
+            SetSong(song);
+            StartGame();
+        }
+
+        /// <summary>Songs available in the selection menu. Null/empty uses test map.</summary>
+        public SongData[] AvailableSongs => availableSongs;
 
 
         #endregion
