@@ -146,6 +146,7 @@ namespace OrchestraMaestro
         public int scoreAwarded;
         public OrchestraSection targetSection;
         public RhythmCue? matchedCue;   // The cue that was matched (if any)
+        public GestureType gestureType; // The gesture that was performed
 
         public static int GetScoreForJudgement(JudgementType judgement)
         {

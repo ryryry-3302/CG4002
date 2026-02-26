@@ -1,8 +1,9 @@
 using UnityEngine;
+using OrchestraMaestro;
 
 /// <summary>
 /// Manages sparkle trail particle effects that follow the tracked baton tip.
-/// Emission scales with baton movement speed; fades when not tracking.
+/// Emission scales with baton movement speed; triggers gesture-specific bursts on judgement.
 /// </summary>
 [RequireComponent(typeof(BatonTracker))]
 public class BatonSparkleEffect : MonoBehaviour
@@ -17,6 +18,7 @@ public class BatonSparkleEffect : MonoBehaviour
     [SerializeField] private float fadeOutSpeed = 4f;
 
     private ParticleSystem sparkleParticles;
+    private ParticleSystem burstParticles;
     private ParticleSystem.EmissionModule emissionModule;
     private Vector3 lastTipPosition;
     private float currentEmissionRate;
@@ -29,6 +31,18 @@ public class BatonSparkleEffect : MonoBehaviour
             batonTracker = GetComponent<BatonTracker>();
 
         EnsureParticleSystem();
+    }
+
+    private void Start()
+    {
+        if (RhythmGameController.Instance != null)
+            RhythmGameController.Instance.OnGestureJudged += OnGestureJudged;
+    }
+
+    private void OnDestroy()
+    {
+        if (RhythmGameController.Instance != null)
+            RhythmGameController.Instance.OnGestureJudged -= OnGestureJudged;
     }
 
     private void EnsureParticleSystem()
@@ -50,6 +64,55 @@ public class BatonSparkleEffect : MonoBehaviour
         }
 
         emissionModule = sparkleParticles.emission;
+
+        // Burst effect system for gesture feedback
+        var burstGo = sparkleParticles.transform.Find("Burst");
+        if (burstGo == null)
+        {
+            burstGo = new GameObject("Burst").transform;
+            burstGo.SetParent(sparkleParticles.transform);
+            burstGo.localPosition = Vector3.zero;
+            burstGo.localRotation = Quaternion.identity;
+            burstGo.localScale = Vector3.one;
+            burstParticles = burstGo.gameObject.AddComponent<ParticleSystem>();
+            ConfigureBurstParticleSystem();
+        }
+        else
+        {
+            burstParticles = burstGo.GetComponent<ParticleSystem>();
+        }
+    }
+
+    private void ConfigureBurstParticleSystem()
+    {
+        var main = burstParticles.main;
+        main.duration = 0.5f;
+        main.loop = false;
+        main.startLifetime = 0.5f;
+        main.startSpeed = 0.08f;
+        main.startSize = 0.008f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.playOnAwake = false;
+
+        var emission = burstParticles.emission;
+        emission.rateOverTime = 0;
+        emission.enabled = true;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 50) });
+
+        var shape = burstParticles.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.01f;
+
+        var colorOverLifetime = burstParticles.colorOverLifetime;
+        colorOverLifetime.enabled = true;
+
+        var renderer = burstParticles.GetComponent<ParticleSystemRenderer>();
+        if (renderer != null)
+        {
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            var mat = GetDefaultParticleMaterial();
+            if (mat != null) renderer.material = mat;
+        }
     }
 
     private void ConfigureParticleSystem()
@@ -148,5 +211,86 @@ public class BatonSparkleEffect : MonoBehaviour
             sparkleParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         else if (currentEmissionRate >= 0.5f && !sparkleParticles.isPlaying)
             sparkleParticles.Play();
+    }
+
+    private void OnGestureJudged(ScoringResult result)
+    {
+        if (burstParticles == null) return;
+
+        Vector3 pos = batonTracker != null && batonTracker.IsTracking
+            ? batonTracker.TipWorldPosition
+            : transform.position;
+
+        burstParticles.transform.position = pos;
+
+        var main = burstParticles.main;
+        var emission = burstParticles.emission;
+        var colorOverLifetime = burstParticles.colorOverLifetime;
+
+        Color burstColor = Color.white;
+        switch (result.judgement)
+        {
+            case JudgementType.Perfect:
+                burstColor = new Color(1f, 0.9f, 0.4f);
+                main.startColor = burstColor;
+                main.startSize = 0.012f;
+                main.startLifetime = 0.6f;
+                main.startSpeed = 0.1f;
+                emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 80) });
+                break;
+            case JudgementType.Good:
+                burstColor = new Color(1f, 1f, 0.95f);
+                main.startColor = burstColor;
+                main.startSize = 0.009f;
+                main.startLifetime = 0.4f;
+                main.startSpeed = 0.06f;
+                emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 35) });
+                break;
+            case JudgementType.Miss:
+                burstColor = new Color(1f, 0.4f, 0.2f);
+                main.startColor = burstColor;
+                main.startSize = 0.006f;
+                main.startLifetime = 0.25f;
+                main.startSpeed = 0.04f;
+                emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 25) });
+                break;
+        }
+
+        // Gesture-themed tweaks
+        ApplyGestureTheme(result.gestureType, ref main, ref emission);
+
+        var grad = new Gradient();
+        Color c = burstColor;
+        grad.SetKeys(
+            new[] { new GradientColorKey(c, 0f), new GradientColorKey(c, 0.5f), new GradientColorKey(c * 0.5f, 1f) },
+            new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.4f, 0.5f), new GradientAlphaKey(0f, 1f) });
+        colorOverLifetime.color = grad;
+
+        burstParticles.Play(true);
+    }
+
+    private void ApplyGestureTheme(GestureType gesture, ref ParticleSystem.MainModule main, ref ParticleSystem.EmissionModule emission)
+    {
+        switch (gesture)
+        {
+            case GestureType.PUNCH:
+            case GestureType.STRONG_ACCENT:
+                main.startSpeed = main.startSpeed.constant * 1.5f;
+                var burst = emission.GetBurst(0);
+                emission.SetBursts(new[] { new ParticleSystem.Burst(0f, burst.count.constant + 20) });
+                break;
+            case GestureType.CIRCLE:
+                main.startLifetime = main.startLifetime.constant * 1.2f;
+                break;
+            case GestureType.UP:
+            case GestureType.V_SHAPE:
+                float spd = main.startSpeed.constant;
+                main.startSpeed = new ParticleSystem.MinMaxCurve(spd, spd * 1.3f);
+                break;
+            case GestureType.WITHDRAW:
+            case GestureType.CLEAR_CUTOFF:
+                main.startSize = main.startSize.constant * 0.8f;
+                break;
+        }
     }
 }

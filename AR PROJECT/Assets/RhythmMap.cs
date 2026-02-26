@@ -304,7 +304,8 @@ namespace OrchestraMaestro
                     timingOffset = 0,
                     scoreAwarded = 0,
                     targetSection = currentSection,
-                    matchedCue = null
+                    matchedCue = null,
+                    gestureType = performedGesture
                 };
             }
 
@@ -340,7 +341,8 @@ namespace OrchestraMaestro
                 timingOffset = bestOffset,
                 scoreAwarded = ScoringResult.GetScoreForJudgement(judgement),
                 targetSection = bestMatch.Value.targetSection ?? currentSection,
-                matchedCue = bestMatch
+                matchedCue = bestMatch,
+                gestureType = performedGesture
             };
         }
 
