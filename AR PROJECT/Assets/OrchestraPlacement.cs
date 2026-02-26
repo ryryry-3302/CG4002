@@ -30,11 +30,14 @@ public class OrchestraPlacement : MonoBehaviour
     
     [Header("Settings")]
     [SerializeField] private float prefabScale = 0.5f;
+    private const float AutoPlaceDistance = 1.8f;
+    private const float AutoPlaceSpacing = 0.55f;
     
     private List<ARRaycastHit> hits = new List<ARRaycastHit>();
     private List<GameObject> placedMembers = new List<GameObject>();
     private int selectedIndex = 0;
     private bool isPlacementMode = true;
+    private bool scanningPaused = false;
     
     // GUI interaction guard - prevents placement when tapping buttons
     private bool guiConsumedInput = false;
@@ -165,12 +168,12 @@ public class OrchestraPlacement : MonoBehaviour
     /// </summary>
     private bool IsInsideGUIArea(Vector2 screenPos)
     {
-        // Placement panel: Rect(10, 10, 200, 340) with GUI.matrix scale 3x
+        // Placement panel: Rect(10, 10, 300, 440) with GUI.matrix scale 3x
         float guiScale = 3f;
-        float guiLeft = 10f * guiScale;     // 30
-        float guiTop = 10f * guiScale;      // 30
-        float guiWidth = 200f * guiScale;   // 600
-        float guiHeight = 340f * guiScale;  // 1020
+        float guiLeft = 10f * guiScale;
+        float guiTop = 10f * guiScale;
+        float guiWidth = 300f * guiScale;
+        float guiHeight = 440f * guiScale;
         
         // Convert Input screen pos (bottom-left origin) to top-left origin
         float topLeftY = Screen.height - screenPos.y;
@@ -264,6 +267,95 @@ public class OrchestraPlacement : MonoBehaviour
         }
         // Default: distribute evenly across sections
         return (OrchestraSection)(prefabIndex % 4);
+    }
+
+    /// <summary>Get prefab index for a section (for auto place)</summary>
+    private int GetPrefabIndexForSection(OrchestraSection section)
+    {
+        if (prefabSections == null || orchestraPrefabs == null) return (int)section % Mathf.Max(1, orchestraPrefabs?.Length ?? 4);
+        for (int i = 0; i < prefabSections.Length && i < orchestraPrefabs.Length; i++)
+        {
+            if (prefabSections[i] == section) return i;
+        }
+        return (int)section % Mathf.Max(1, orchestraPrefabs.Length);
+    }
+
+    /// <summary>Auto-place all 4 characters with spacing, at good distance from user</summary>
+    private void AutoPlaceAll()
+    {
+        if (orchestraPrefabs == null || orchestraPrefabs.Length == 0)
+        {
+            Debug.LogWarning("[OrchestraPlacement] No prefabs for auto place");
+            return;
+        }
+
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            Debug.LogWarning("[OrchestraPlacement] No camera for auto place");
+            return;
+        }
+
+        Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        if (!raycastManager.Raycast(screenCenter, hits, TrackableType.PlaneWithinPolygon))
+        {
+            Debug.LogWarning("[OrchestraPlacement] Auto place: no plane detected. Point at a surface or resume scanning.");
+            return;
+        }
+
+        Pose hitPose = hits[0].pose;
+        Vector3 camPos = cam.transform.position;
+        float hitDist = Vector3.Distance(camPos, hitPose.position);
+        float useDist = Mathf.Max(hitDist, AutoPlaceDistance);
+        Vector3 center = camPos + (hitPose.position - camPos).normalized * useDist;
+        center.y = hitPose.position.y;
+
+        Vector3 right = Vector3.Cross(Vector3.up, (center - camPos).normalized).normalized;
+        if (right.sqrMagnitude < 0.01f) right = hitPose.rotation * Vector3.right;
+
+        ClearAllPlacements();
+
+        float[] offsets = { -1.5f, -0.5f, 0.5f, 1.5f };
+        for (int i = 0; i < 4; i++)
+        {
+            OrchestraSection section = (OrchestraSection)i;
+            int prefabIdx = GetPrefabIndexForSection(section);
+            if (orchestraPrefabs[prefabIdx] == null) continue;
+
+            Vector3 pos = center + right * (offsets[i] * AutoPlaceSpacing);
+            Quaternion rot = Quaternion.LookRotation(Vector3.ProjectOnPlane(pos - camPos, Vector3.up));
+            PlaceOrchestraMemberAt(pos, rot, section, prefabIdx);
+        }
+
+        Debug.Log($"[OrchestraPlacement] Auto placed 4 characters at distance {useDist:F2}m, spacing {AutoPlaceSpacing}m");
+    }
+
+    private void PlaceOrchestraMemberAt(Vector3 position, Quaternion rotation, OrchestraSection section, int prefabIndex)
+    {
+        GameObject prefab = orchestraPrefabs[prefabIndex];
+        if (prefab == null) return;
+
+        Quaternion finalRotation = rotation * prefab.transform.rotation;
+        GameObject member = Instantiate(prefab, position, finalRotation);
+        member.transform.localScale = prefab.transform.localScale * 0.75f;
+
+        Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+        if (renderers.Length > 0)
+        {
+            Bounds combinedBounds = renderers[0].bounds;
+            for (int j = 1; j < renderers.Length; j++)
+                combinedBounds.Encapsulate(renderers[j].bounds);
+            Vector3 boundsCenter = combinedBounds.center;
+            Vector3 correction = position - boundsCenter;
+            correction.y = 0f;
+            member.transform.position += correction;
+        }
+
+        placedMembers.Add(member);
+        sectionMembers[(int)section].Add(member);
+        sectionPlacedMember[section] = member;
+        memberToSection[member] = section;
+        CacheOriginalColors(member);
     }
     
     /// <summary>Cache original material colors for later restoration</summary>
@@ -416,7 +508,7 @@ public class OrchestraPlacement : MonoBehaviour
     public void UnlockPlacements()
     {
         isPlacementMode = true;
-        planeManager.enabled = true;
+        planeManager.enabled = !scanningPaused;
         
         // Show existing detected planes again
         foreach (var plane in planeManager.trackables)
@@ -871,7 +963,7 @@ public class OrchestraPlacement : MonoBehaviour
     private void DrawPlacementUI()
     {
         float panelW = 300f;
-        float panelH = 380f;
+        float panelH = 440f;
         GUILayout.BeginArea(new Rect(10, 10, panelW, panelH), hudBoxStyle);
         
         GUILayout.Label("🎵 ORCHESTRA SETUP", headerStyle);
@@ -926,6 +1018,16 @@ public class OrchestraPlacement : MonoBehaviour
             ClearAllPlacements();
         if (GUILayout.Button("🔄 Rescan Planes", buttonStyle))
             RescanPlanes();
+
+        string scanLabel = scanningPaused ? "▶ Resume Scanning" : "⏸ Pause Scanning";
+        if (GUILayout.Button(scanLabel, buttonStyle))
+        {
+            scanningPaused = !scanningPaused;
+            planeManager.enabled = !scanningPaused;
+        }
+
+        if (GUILayout.Button("✨ Auto Place", buttonStyle))
+            AutoPlaceAll();
         
         GUILayout.Space(8);
         
@@ -946,6 +1048,12 @@ public class OrchestraPlacement : MonoBehaviour
     {
         var gameState = RhythmGameController.Instance?.CurrentState 
             ?? RhythmGameController.GameState.Setup;
+        
+        if (gameState == RhythmGameController.GameState.Setup)
+        {
+            DrawSongSelection();
+            return;
+        }
         
         if (gameState == RhythmGameController.GameState.Results)
         {
@@ -1010,6 +1118,45 @@ public class OrchestraPlacement : MonoBehaviour
             UnlockPlacements();
         }
     }
+
+    private void DrawSongSelection()
+    {
+        var ctrl = RhythmGameController.Instance;
+        if (ctrl == null) return;
+
+        float panelW = 220f;
+        float panelH = 320f;
+        float centerX = (Screen.width / 3f - panelW) / 2f;
+        float centerY = (Screen.height / 3f - panelH) / 2f;
+
+        GUILayout.BeginArea(new Rect(centerX, centerY, panelW, panelH), hudBoxStyle);
+        GUILayout.Label("Choose a Song", headerStyle);
+        GUILayout.Space(12);
+
+        var songs = ctrl.AvailableSongs;
+        if (songs != null && songs.Length > 0)
+        {
+            foreach (var song in songs)
+            {
+                if (song == null) continue;
+                string label = string.IsNullOrEmpty(song.artistName)
+                    ? song.songName
+                    : $"{song.songName} — {song.artistName}";
+                if (GUILayout.Button(label, buttonStyle, GUILayout.Height(36)))
+                {
+                    ctrl.SelectSongAndStart(song);
+                }
+            }
+            GUILayout.Space(8);
+        }
+
+        GUILayout.Space(12);
+        if (GUILayout.Button("← Back to Placement", buttonStyle))
+        {
+            UnlockPlacements();
+        }
+        GUILayout.EndArea();
+    }
     
     private void DrawResultsScreen()
     {
@@ -1038,7 +1185,7 @@ public class OrchestraPlacement : MonoBehaviour
         
         if (GUILayout.Button("▶ PLAY AGAIN", buttonStyle, GUILayout.Height(30)))
         {
-            ctrl.RestartGame();
+            ctrl.ReturnToSongSelection();
         }
         
         GUILayout.Space(4);
