@@ -25,18 +25,27 @@ namespace OrchestraMaestro
         private double songStartDspTime;
         private bool isPlaying = false;
 
+        // Tutorial pause
+        private bool isPausedForTutorial = false;
+        private float pausedAtTime = 0f;
+
         // Events
         public event Action<RhythmCue> OnCueApproaching;
         public event Action<RhythmCue> OnCueMissed;
+        public event Action<ScoringResult> OnCueAutoHit; // Cheats mode: auto-perfect when user doesn't press in time
         public event Action OnSongFinished;
+        public event Action<RhythmCue> OnTutorialPauseRequested;
         
         private bool songFinished = false;
 
         /// <summary>Whether the rhythm map is currently playing</summary>
         public bool IsPlaying => isPlaying;
 
+        /// <summary>Whether paused for tutorial (waiting for user gesture)</summary>
+        public bool IsPausedForTutorial => isPausedForTutorial;
+
         /// <summary>Current song time in seconds</summary>
-        public float CurrentSongTime => isPlaying ? (float)(AudioSettings.dspTime - songStartDspTime) : 0f;
+        public float CurrentSongTime => isPausedForTutorial ? pausedAtTime : (isPlaying ? (float)(AudioSettings.dspTime - songStartDspTime) : 0f);
 
         /// <summary>Total number of cues in the map</summary>
         public int TotalCues => cues.Count;
@@ -145,6 +154,7 @@ namespace OrchestraMaestro
             nextCueIndex = 0;
             isPlaying = true;
             songFinished = false;
+            isPausedForTutorial = false;
             
             // Reset consumed flags
             for (int i = 0; i < cues.Count; i++)
@@ -168,17 +178,50 @@ namespace OrchestraMaestro
         public void PausePlayback()
         {
             isPlaying = false;
+            isPausedForTutorial = false;
+        }
+
+        /// <summary>Pause for tutorial mode - freeze time at cue. Called by RhythmGameController.</summary>
+        public void PauseForTutorial(float freezeTime)
+        {
+            isPausedForTutorial = true;
+            pausedAtTime = freezeTime;
+        }
+
+        /// <summary>Resume from tutorial pause. Called after user performs correct gesture.</summary>
+        public void ResumeFromTutorial()
+        {
+            isPausedForTutorial = false;
         }
 
         #endregion
 
         #region Cue Scheduling
 
+        private const float TutorialPauseThreshold = 0.05f;
+
         private void Update()
         {
             if (!isPlaying) return;
+            if (isPausedForTutorial) return;
 
             float currentTime = CurrentSongTime;
+
+            // Tutorial mode: pause just before cue so user can practice
+            if (GameSettings.CurrentMode == GameMode.Tutorial)
+            {
+                for (int i = nextCueIndex; i < cues.Count; i++)
+                {
+                    var cue = cues[i];
+                    if (cue.consumed) continue;
+                    float timeUntilCue = cue.timestamp - currentTime;
+                    if (timeUntilCue <= TutorialPauseThreshold && timeUntilCue > 0)
+                    {
+                        OnTutorialPauseRequested?.Invoke(cue);
+                        return;
+                    }
+                }
+            }
 
             // Check for upcoming cues to display
             for (int i = nextCueIndex; i < cues.Count; i++)
@@ -191,19 +234,59 @@ namespace OrchestraMaestro
                 {
                     OnCueApproaching?.Invoke(cue);
                 }
+            }
+        }
 
-                // Cue has passed miss window without being hit
-                if (timeUntilCue < -missWindow && !cue.consumed)
+        /// <summary>
+        /// Process missed/auto-hit cues in LateUpdate so CueRadarManager.Update runs first
+        /// and has a chance to display cues via GetUpcomingCues before we consume them.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!isPlaying) return;
+            if (isPausedForTutorial) return;
+
+            float currentTime = CurrentSongTime;
+
+            for (int i = nextCueIndex; i < cues.Count; i++)
+            {
+                var cue = cues[i];
+                float timeUntilCue = cue.timestamp - currentTime;
+
+                // Cheats: auto-perfect at exact beat (timeUntilCue <= 0)
+                // Regular: miss when cue passed miss window (timeUntilCue < -missWindow)
+                bool shouldConsume = GameSettings.CurrentMode == GameMode.Cheats
+                    ? (timeUntilCue <= 0 && !cue.consumed)
+                    : (timeUntilCue < -missWindow && !cue.consumed);
+
+                if (shouldConsume)
                 {
                     cue.consumed = true;
                     cues[i] = cue;
-                    OnCueMissed?.Invoke(cue);
-                    
-                    // Advance next cue index
+
+                    if (GameSettings.CurrentMode == GameMode.Cheats)
+                    {
+                        // Cheats mode: auto-perfect instead of miss
+                        var autoResult = new ScoringResult
+                        {
+                            judgement = JudgementType.Perfect,
+                            timingOffset = 0,
+                            scoreAwarded = ScoringResult.GetScoreForJudgement(JudgementType.Perfect),
+                            targetSection = cue.targetSection ?? OrchestraSection.Drum,
+                            matchedCue = cue,
+                            gestureType = cue.gestureType
+                        };
+                        OnCueAutoHit?.Invoke(autoResult);
+                    }
+                    else
+                    {
+                        OnCueMissed?.Invoke(cue);
+                    }
+
                     if (i == nextCueIndex) nextCueIndex++;
                 }
             }
-            
+
             // Check if song is finished (all cues consumed + grace period)
             if (!songFinished && nextCueIndex >= cues.Count)
             {

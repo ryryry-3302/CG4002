@@ -60,6 +60,12 @@ namespace OrchestraMaestro
         public int GoodCount => goodCount;
         public int MissCount => missCount;
 
+        /// <summary>Tutorial: wrong gesture hint to display. Cleared when correct or after timeout.</summary>
+        public string TutorialWrongGestureHint { get; private set; }
+        /// <summary>Tutorial: whether playback is paused waiting for user gesture.</summary>
+        public bool IsTutorialPaused => rhythmMap != null && rhythmMap.IsPausedForTutorial;
+        private float tutorialWrongGestureTime;
+
         #region Unity Lifecycle
 
         private void Awake()
@@ -85,7 +91,9 @@ namespace OrchestraMaestro
             if (rhythmMap != null)
             {
                 rhythmMap.OnCueMissed += HandleCueMissed;
+                rhythmMap.OnCueAutoHit += HandleCueAutoHit;
                 rhythmMap.OnSongFinished += HandleSongFinished;
+                rhythmMap.OnTutorialPauseRequested += HandleTutorialPauseRequested;
             }
 
             // Subscribe to orchestra placement lock event
@@ -105,6 +113,12 @@ namespace OrchestraMaestro
             // Game stays in Setup; song selection UI will call SelectSongAndStart when user picks
         }
 
+        private void Update()
+        {
+            if (!string.IsNullOrEmpty(TutorialWrongGestureHint) && Time.time - tutorialWrongGestureTime > 3f)
+                TutorialWrongGestureHint = null;
+        }
+
         private void OnDestroy()
         {
             if (MQTTManager.Instance != null)
@@ -121,7 +135,9 @@ namespace OrchestraMaestro
             if (rhythmMap != null)
             {
                 rhythmMap.OnCueMissed -= HandleCueMissed;
+                rhythmMap.OnCueAutoHit -= HandleCueAutoHit;
                 rhythmMap.OnSongFinished -= HandleSongFinished;
+                rhythmMap.OnTutorialPauseRequested -= HandleTutorialPauseRequested;
             }
 
             if (Instance == this) Instance = null;
@@ -150,6 +166,7 @@ namespace OrchestraMaestro
         {
             ResetScore();
             selectedSectionIndex = 0;
+            tutorialFirstPauseShown = false;
             
             // Load song data if available
             if (currentSong != null)
@@ -298,13 +315,13 @@ namespace OrchestraMaestro
 
         private void HandleGestureReceived(LeftGestureEvent evt)
         {
-            if (currentState != GameState.Playing) return;
+            if (currentState != GameState.Playing && !(rhythmMap != null && rhythmMap.IsPausedForTutorial)) return;
 
             GestureType gesture = evt.GetGestureType();
             
             Debug.Log($"[RhythmGameController] Processing gesture: {gesture}");
 
-            // Handle section navigation gestures (LEFT/RIGHT)
+            // Handle section navigation gestures (LEFT/RIGHT) - always allow, including during tutorial pause
             if (GestureUtils.IsSectionNavigation(gesture))
             {
                 if (gesture == GestureType.LEFT)
@@ -327,7 +344,30 @@ namespace OrchestraMaestro
 
             // Judge timing against rhythm map
             ScoringResult result = rhythmMap.JudgeGesture(gesture, SelectedSection);
+
+            // Tutorial pause: wrong gesture - show hint, don't count as miss
+            if (rhythmMap != null && rhythmMap.IsPausedForTutorial && result.judgement == JudgementType.Miss)
+            {
+                if (tutorialWaitingCue.HasValue)
+                {
+                    var cue = tutorialWaitingCue.Value;
+                    string sectionName = cue.targetSection.HasValue ? cue.targetSection.Value.ToString() : "any";
+                    TutorialWrongGestureHint = $"Try {cue.gestureType} for {sectionName}. Use LEFT/RIGHT to change section.";
+                    tutorialWrongGestureTime = Time.time;
+                }
+                return;
+            }
+
             ProcessScoringResult(result, gesture);
+
+            // Tutorial pause: correct gesture - resume playback
+            if (rhythmMap != null && rhythmMap.IsPausedForTutorial)
+            {
+                rhythmMap.ResumeFromTutorial();
+                if (audioSource != null) audioSource.UnPause();
+                tutorialWaitingCue = null;
+                TutorialWrongGestureHint = null;
+            }
         }
 
         private void HandleDownstroke(float timestamp)
@@ -357,6 +397,13 @@ namespace OrchestraMaestro
 
             Debug.Log($"[RhythmGameController] Missed cue: {cue.gestureType} at {cue.timestamp}");
         }
+
+        private void HandleCueAutoHit(ScoringResult result)
+        {
+            if (currentState != GameState.Playing) return;
+            ProcessScoringResult(result, result.gestureType);
+            Debug.Log($"[RhythmGameController] Cheats auto-perfect: {result.gestureType} at {result.matchedCue?.timestamp}");
+        }
         
         private void HandleSongFinished()
         {
@@ -364,6 +411,32 @@ namespace OrchestraMaestro
             Debug.Log("[RhythmGameController] Song finished - ending game");
             EndGame();
         }
+
+        private void HandleTutorialPauseRequested(RhythmCue cue)
+        {
+            if (currentState != GameState.Playing) return;
+            rhythmMap.PauseForTutorial(cue.timestamp);
+            if (audioSource != null && audioSource.isPlaying)
+                audioSource.Pause();
+            tutorialWaitingCue = cue;
+            TutorialWrongGestureHint = null;
+
+            if (!tutorialFirstPauseShown)
+            {
+                tutorialFirstPauseShown = true;
+                if (TutorialDialogController.Instance == null)
+                {
+                    var go = new GameObject("TutorialDialogController");
+                    go.AddComponent<TutorialDialogController>();
+                }
+                TutorialDialogController.Instance?.Show("When you see a gesture, perform it! The song will pause so you can practice.");
+            }
+
+            Debug.Log($"[RhythmGameController] Tutorial pause at cue: {cue.gestureType} for {cue.targetSection}");
+        }
+
+        private RhythmCue? tutorialWaitingCue;
+        private bool tutorialFirstPauseShown;
         
         /// <summary>Return to song selection (keeps placements). Called from Play Again.</summary>
         public void ReturnToSongSelection()
