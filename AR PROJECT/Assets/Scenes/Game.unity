@@ -609,7 +609,7 @@ MonoBehaviour:
   radarDistance: 0
   radarHeight: 0.7
   radarScale: 70
-  cueLeadTime: 2
+  cueLeadTime: 3
   orchestraPlacement: {fileID: 1141421495}
   rhythmMap: {fileID: 164925909}
   use3DRadar: 1

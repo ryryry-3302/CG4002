@@ -82,6 +82,9 @@ public class OrchestraPlacement : MonoBehaviour
     private Texture2D texDarkBg;
     private Texture2D texAccentBg;
     private Texture2D texAccentHover;
+    private Texture2D texSliderBg;
+    private Texture2D texSliderFill;
+    private Texture2D texSliderMarker;
     private Texture2D texSubtleBg;
     private Texture2D texSubtleHover;
     
@@ -455,9 +458,6 @@ public class OrchestraPlacement : MonoBehaviour
 
     public void LockPlacements()
     {
-        // #region agent log
-        Debug.LogError($"[DBG] LockPlacements: sectionPlacedMember.Count={sectionPlacedMember.Count}, sectionMembers counts={sectionMembers[0].Count},{sectionMembers[1].Count},{sectionMembers[2].Count},{sectionMembers[3].Count}");
-        // #endregion
         isPlacementMode = false;
         // Hide all planes when done placing
         foreach (var plane in planeManager.trackables)
@@ -521,9 +521,6 @@ public class OrchestraPlacement : MonoBehaviour
     /// <summary>Reset game state and return to main menu.</summary>
     public void ExitToMainMenu()
     {
-        // #region agent log
-        DebugLog.Log("OrchestraPlacement.ExitToMainMenu", "Exit to menu", "entry", "B");
-        // #endregion
         ClearAllPlacements();
         if (RhythmGameController.Instance != null)
         {
@@ -539,9 +536,6 @@ public class OrchestraPlacement : MonoBehaviour
 
     public void UnlockPlacements()
     {
-        // #region agent log
-        DebugLog.Log("OrchestraPlacement.UnlockPlacements", "Edit pressed - UnlockPlacements", "entry", "A");
-        // #endregion
         isPlacementMode = true;
         planeManager.enabled = true;
         
@@ -961,6 +955,18 @@ public class OrchestraPlacement : MonoBehaviour
         gesturePromptStyle.fontStyle = FontStyle.Bold;
         gesturePromptStyle.normal.textColor = new Color(1f, 0.95f, 0.6f);
         gesturePromptStyle.alignment = TextAnchor.MiddleCenter;
+        
+        texSliderBg = new Texture2D(1, 1);
+        texSliderBg.SetPixel(0, 0, new Color(0.2f, 0.2f, 0.3f, 0.6f));
+        texSliderBg.Apply();
+        
+        texSliderFill = new Texture2D(1, 1);
+        texSliderFill.SetPixel(0, 0, new Color(0.3f, 0.7f, 1f, 0.85f));
+        texSliderFill.Apply();
+        
+        texSliderMarker = new Texture2D(1, 1);
+        texSliderMarker.SetPixel(0, 0, new Color(1f, 1f, 1f, 0.95f));
+        texSliderMarker.Apply();
     }
     
     [Header("Selector Halo")]
@@ -1083,108 +1089,141 @@ public class OrchestraPlacement : MonoBehaviour
             return;
         }
         
-        float hudW = 160f;
-        float hudH = 155f;
-        
-        // Top: song title + player time (and optional skip button)
+        float sw = Screen.width / 3f;
+        float sh = Screen.height / 3f;
         var ctrl = RhythmGameController.Instance;
-        float topY = 8f;
-        float topH = 42f;  // Taller to fit long song titles
-        float topW = 280f;
-        string songTitle = ctrl?.CurrentSong != null ? ctrl.CurrentSong.songName : "—";
+        
+        // ── Top-left: song title + time ──
         float t = ctrl != null ? ctrl.CurrentSongTime : 0f;
-        int mins = Mathf.FloorToInt(t / 60f);
-        int secs = Mathf.FloorToInt(t % 60f);
-        string timeStr = $"{mins}:{secs:D2}";
-        labelStyle.normal.textColor = new Color(0.75f, 0.8f, 0.9f);
+        string songTitle = ctrl?.CurrentSong != null ? ctrl.CurrentSong.songName : "—";
+        string timeStr = $"{Mathf.FloorToInt(t / 60f)}:{Mathf.FloorToInt(t % 60f):D2}";
+        int savedLabelSize = labelStyle.fontSize;
+        labelStyle.fontSize = 14;
+        labelStyle.fontStyle = FontStyle.Bold;
         labelStyle.wordWrap = true;
-        GUI.Label(new Rect(10, topY, topW, topH), $"{songTitle}  {timeStr}", labelStyle);
+        DrawOutlinedLabel(new Rect(10, 6, 220f, 44f), $"{songTitle}  {timeStr}", labelStyle, new Color(0.85f, 0.88f, 0.95f));
         labelStyle.wordWrap = false;
-        if (ctrl != null && ctrl.CanSkipToFirstCue)
-        {
-            if (GUI.Button(new Rect(Screen.width / 3f - 130, topY, 120, 28), "⏩ Skip to first cue", buttonStyle))
-                ctrl.SkipToFirstCueMinus5();
-        }
-
-        // Top-center: Score + Combo (use fixed Rects to avoid GUILayout control-count mismatch)
-        float centerX = (Screen.width / 3f - hudW) / 2f;
-        Rect scoreRect = new Rect(centerX, 54f, hudW, hudH);  // Below taller song title bar
-        GUI.BeginGroup(scoreRect, hudBoxStyle);
-        float y = 10f;
-        int score = RhythmGameController.Instance?.TotalScore ?? 0;
-        int combo = RhythmGameController.Instance?.Combo ?? 0;
+        labelStyle.fontStyle = FontStyle.Normal;
+        labelStyle.fontSize = savedLabelSize;
         
-        GUI.Label(new Rect(0, y, hudW, 22), score.ToString("N0"), scoreStyle);
-        y += 24f;
-        
+        // ── Top-right: score + combo ──
+        int score = ctrl?.TotalScore ?? 0;
+        int combo = ctrl?.Combo ?? 0;
+        scoreStyle.fontSize = 27;
+        scoreStyle.alignment = TextAnchor.MiddleRight;
+        DrawOutlinedLabel(new Rect(sw - 150, 4, 140, 30), score.ToString("N0"), scoreStyle, Color.white);
         if (combo > 1)
-            GUI.Label(new Rect(0, y, hudW, 18), $"{combo}x COMBO", comboStyle);
-        y += 22f;
+        {
+            comboStyle.alignment = TextAnchor.MiddleRight;
+            DrawOutlinedLabel(new Rect(sw - 150, 34, 140, 20), $"{combo}x COMBO", comboStyle, new Color(1f, 0.84f, 0f));
+        }
+        scoreStyle.fontSize = 18;
+        scoreStyle.alignment = TextAnchor.MiddleCenter;
+        comboStyle.alignment = TextAnchor.MiddleCenter;
         
-        string sectionName = RhythmGameController.Instance?.SelectedSection.ToString() ?? "---";
-        GUI.Label(new Rect(0, y, hudW, 18), $"▸ {sectionName}", sectionLabelStyle);
-        y += 22f;
-        
+        // ── Top-center: gesture prompt (bold, no box) + timing slider ──
         var cueInfo = CueRadarManager.Instance?.GetCurrentActiveGesture() ?? (null, null, Color.white);
+        float cueProgress = CueRadarManager.Instance?.GetCurrentCueProgress() ?? -1f;
+        
         if (cueInfo.gestureName != null)
         {
-            gesturePromptStyle.normal.textColor = cueInfo.timingColor;
-            GUI.Label(new Rect(0, y, hudW, 18), cueInfo.gestureName, gesturePromptStyle);
-            y += 20f;
-            sectionLabelStyle.normal.textColor = cueInfo.timingColor;
-            GUI.Label(new Rect(0, y, hudW, 18), $"[{cueInfo.sectionName}]", sectionLabelStyle);
+            float promptW = 260f;
+            float promptX = (sw - promptW) / 2f;
+            
+            // Gesture name — large bold (doubled from 16 to 32)
+            gesturePromptStyle.fontSize = 32;
+            gesturePromptStyle.alignment = TextAnchor.MiddleCenter;
+            DrawOutlinedLabel(new Rect(promptX, 0, promptW, 42), cueInfo.gestureName, gesturePromptStyle, cueInfo.timingColor);
+            gesturePromptStyle.fontSize = 13;
+            
+            // Section name below — also outlined
+            int savedSectionSize = sectionLabelStyle.fontSize;
+            sectionLabelStyle.fontSize = 14;
+            DrawOutlinedLabel(new Rect(promptX, 40, promptW, 20), $"[{cueInfo.sectionName}]", sectionLabelStyle, cueInfo.timingColor);
             sectionLabelStyle.normal.textColor = new Color(0.6f, 0.8f, 1f);
+            sectionLabelStyle.fontSize = savedSectionSize;
+            
+            // Timing slider below the gesture
+            if (cueProgress >= 0f)
+            {
+                float sliderW = 160f;
+                float sliderH = 8f;
+                float sliderX = (sw - sliderW) / 2f;
+                float sliderY = 62f;
+                
+                // Background track
+                GUI.DrawTexture(new Rect(sliderX, sliderY, sliderW, sliderH), texSliderBg);
+                
+                // Fill (left to right as cue approaches)
+                float fillW = sliderW * Mathf.Clamp01(cueProgress);
+                Color fillCol = cueInfo.timingColor;
+                texSliderFill.SetPixel(0, 0, new Color(fillCol.r, fillCol.g, fillCol.b, 0.85f));
+                texSliderFill.Apply();
+                GUI.DrawTexture(new Rect(sliderX, sliderY, fillW, sliderH), texSliderFill);
+                
+                // Hit marker (white line at right end = perfect timing)
+                GUI.DrawTexture(new Rect(sliderX + sliderW - 2, sliderY - 1, 3, sliderH + 2), texSliderMarker);
+            }
         }
-        GUI.EndGroup();
         
-        // Bottom-center: Judgement feedback (Perfect / Good / Miss) with black outline
+        // ── Right-center: skip button ──
+        if (ctrl != null && ctrl.CanSkipToFirstCue)
+        {
+            float skipW = 110f;
+            float skipH = 28f;
+            float skipX = sw - skipW - 10;
+            float skipY = (sh - skipH) / 2f;
+            if (GUI.Button(new Rect(skipX, skipY, skipW, skipH), "⏩ Skip", buttonStyle))
+                ctrl.SkipToFirstCueMinus5();
+        }
+        
+        // ── Center: Judgement feedback (Perfect / Good / Miss) ──
         if (judgementTimer > 0)
         {
-            float alpha = Mathf.Clamp01(judgementTimer / 0.3f); // fade out in last 0.3s
+            float alpha = Mathf.Clamp01(judgementTimer / 0.3f);
             Color col = lastJudgementColor;
             col.a = alpha;
-            judgementStyle.normal.textColor = col;
             
             float jW = 200f;
             float jH = 40f;
-            float jX = (Screen.width / 3f - jW) / 2f;
-            float jY = Screen.height / 3f - 55f;  // Bottom centre of HUD
+            float jX = (sw - jW) / 2f;
+            float jY = sh * 0.45f;
             Rect jRect = new Rect(jX, jY, jW, jH);
-            // Black outline (8 directions for clean edge)
-            judgementStyle.normal.textColor = new Color(0, 0, 0, alpha);
-            for (int ox = -1; ox <= 1; ox++)
-                for (int oy = -1; oy <= 1; oy++)
-                    if (ox != 0 || oy != 0)
-                        GUI.Label(new Rect(jRect.x + ox, jRect.y + oy, jW, jH), lastJudgement, judgementStyle);
-            // Colored text on top
-            judgementStyle.normal.textColor = col;
-            GUI.Label(jRect, lastJudgement, judgementStyle);
+            DrawOutlinedLabel(jRect, lastJudgement, judgementStyle, col);
         }
 
-        // Tutorial: paused - perform gesture
-        if (RhythmGameController.Instance != null && RhythmGameController.Instance.IsTutorialPaused)
+        // ── Tutorial: paused — perform gesture ──
+        if (ctrl != null && ctrl.IsTutorialPaused)
         {
             headerStyle.normal.textColor = new Color(1f, 0.9f, 0.5f);
-            GUI.Label(new Rect((Screen.width / 3f - 200f) / 2f, Screen.height / 3f * 0.25f, 200f, 30f), "Perform the gesture!", headerStyle);
+            GUI.Label(new Rect((sw - 200f) / 2f, sh * 0.25f, 200f, 30f), "Perform the gesture!", headerStyle);
         }
 
         // Tutorial: wrong gesture hint
-        string wrongHint = RhythmGameController.Instance?.TutorialWrongGestureHint;
+        string wrongHint = ctrl?.TutorialWrongGestureHint;
         if (!string.IsNullOrEmpty(wrongHint))
         {
-            judgementStyle.normal.textColor = new Color(1f, 0.6f, 0.3f);
-            float hW = 280f;
-            float hH = 50f;
-            float hX = (Screen.width / 3f - hW) / 2f;
-            float hY = Screen.height / 3f * 0.5f;
-            GUI.Label(new Rect(hX, hY, hW, hH), wrongHint, labelStyle);
+            labelStyle.normal.textColor = new Color(1f, 0.6f, 0.3f);
+            GUI.Label(new Rect((sw - 280f) / 2f, sh * 0.5f, 280f, 50f), wrongHint, labelStyle);
         }
         
-        // Bottom-left: small unlock button
-        if (GUI.Button(new Rect(10, Screen.height / 3f - 35, 70, 22), "✎ Edit", buttonStyle))
+        // ── Bottom-left: edit button ──
+        if (GUI.Button(new Rect(10, sh - 35, 70, 22), "✎ Edit", buttonStyle))
         {
             UnlockPlacements();
         }
+    }
+    
+    private void DrawOutlinedLabel(Rect rect, string text, GUIStyle style, Color fgColor)
+    {
+        float a = fgColor.a;
+        style.normal.textColor = new Color(0, 0, 0, a);
+        for (int ox = -1; ox <= 1; ox++)
+            for (int oy = -1; oy <= 1; oy++)
+                if (ox != 0 || oy != 0)
+                    GUI.Label(new Rect(rect.x + ox, rect.y + oy, rect.width, rect.height), text, style);
+        style.normal.textColor = fgColor;
+        GUI.Label(rect, text, style);
     }
 
     private void DrawSongSelection()

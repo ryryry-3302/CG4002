@@ -3,9 +3,6 @@ using System.Collections.Generic;
 
 namespace OrchestraMaestro
 {
-    // #region agent log
-    static class DebugLog { static string P() { try { return System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(Application.dataPath)), ".cursor", "debug-da7839.log"); } catch { return null; } } public static void Log(string loc, string msg, string data, string hid) { var p = P(); if (p == null) return; try { var d = string.IsNullOrEmpty(data) ? "{}" : "{\"raw\":\"" + data.Replace("\\","\\\\").Replace("\"","\\\"") + "\"}"; var j = "{\"sessionId\":\"da7839\",\"location\":\"" + (loc ?? "").Replace("\\","\\\\").Replace("\"","\\\"") + "\",\"message\":\"" + (msg ?? "").Replace("\\","\\\\").Replace("\"","\\\"") + "\",\"data\":" + d + ",\"hypothesisId\":\"" + (hid ?? "") + "\",\"timestamp\":" + (long)(System.DateTime.UtcNow - new System.DateTime(1970,1,1)).TotalMilliseconds + "}\n"; System.IO.File.AppendAllText(p, j); } catch {} } }
-    // #endregion
     /// <summary>
     /// Manages all 4 cue radars (one per instrument).
     /// Queues cues per section, shows next after current resolves.
@@ -21,7 +18,7 @@ namespace OrchestraMaestro
         [SerializeField] private float radarScale = 0.5f;     // World scale of radar
         
         [Header("Timing")]
-        [SerializeField] private float cueLeadTime = 2.0f;    // Show cue X seconds before hit
+        [SerializeField] private float cueLeadTime = 3.0f;    // Show cue X seconds before hit
         
         [Header("References")]
         [SerializeField] private OrchestraPlacement orchestraPlacement;
@@ -77,6 +74,22 @@ namespace OrchestraMaestro
                 }
             }
             return (null, null, Color.white);
+        }
+        
+        /// <summary>Get timing progress of the nearest active cue (0 = just appeared, 1 = hit time, >1 = past due). Returns -1 if no active cue.</summary>
+        public float GetCurrentCueProgress()
+        {
+            if (rhythmMap == null) return -1f;
+            float songTime = rhythmMap.CurrentSongTime;
+            for (int i = 0; i < 4; i++)
+            {
+                if (activeCues[i].HasValue)
+                {
+                    float remaining = activeCues[i].Value.timestamp - songTime;
+                    return 1f - Mathf.Clamp01(remaining / cueLeadTime);
+                }
+            }
+            return -1f;
         }
 
         #region Unity Lifecycle
@@ -153,9 +166,6 @@ namespace OrchestraMaestro
             // Check if we should spawn radars (game started playing)
             if (!radarsSpawned && rhythmMap != null && rhythmMap.IsPlaying)
             {
-                // #region agent log
-                DebugLog.Log("CueRadarManager.Update", "Spawning radars (IsPlaying)", "radarsSpawned=" + radarsSpawned, "D");
-                // #endregion
                 Debug.Log("[CueRadarManager] Game is playing - spawning radars now");
                 SpawnRadars();
                 radarsSpawned = true;
@@ -191,9 +201,6 @@ namespace OrchestraMaestro
 
         private void HandleGameStateChanged(RhythmGameController.GameState newState)
         {
-            // #region agent log
-            Debug.LogError($"[DBG] HandleGameStateChanged: newState={newState}, radarsSpawned={radarsSpawned}");
-            // #endregion
             if (newState == RhythmGameController.GameState.Playing && !radarsSpawned)
             {
                 SpawnRadars();
@@ -218,9 +225,6 @@ namespace OrchestraMaestro
 
         private void SpawnRadars()
         {
-            // #region agent log
-            DebugLog.Log("CueRadarManager.SpawnRadars", "entry", "prefabNull=" + (cueRadarPrefab == null) + " use3D=" + use3DRadar + " orchNull=" + (orchestraPlacement == null), "D");
-            // #endregion
             if (cueRadarPrefab == null)
             {
                 // Use 3D radars if enabled (more reliable in AR)
@@ -281,21 +285,11 @@ namespace OrchestraMaestro
                 Debug.Log($"[CueRadarManager] Spawned radar for {section} at {position}");
             }
             
-            // #region agent log
-            DebugLog.Log("CueRadarManager.SpawnRadars", "Prefab path done", "created=4", "D");
-            // #endregion
             Debug.Log("[CueRadarManager] Spawned 4 cue radars from prefab");
         }
 
         private void Create3DRadars()
         {
-            // #region agent log
-            int placedCount = 0;
-            if (orchestraPlacement != null)
-                for (int i = 0; i < 4; i++)
-                    if (orchestraPlacement.GetSectionPosition((OrchestraSection)i).HasValue) placedCount++;
-            Debug.LogError($"[DBG] Create3DRadars: orch={(orchestraPlacement != null ? orchestraPlacement.GetInstanceID().ToString() : "NULL")}, placedSections={placedCount}, radarsSpawned={radarsSpawned}");
-            // #endregion
             // Debug: log all section positions
             for (int i = 0; i < 4; i++)
             {
@@ -320,9 +314,6 @@ namespace OrchestraMaestro
                     (sectionPos.HasValue ? $" (instrument at {sectionPos.Value})" : " (fallback - no instrument)"));
             }
             
-            // #region agent log
-            DebugLog.Log("CueRadarManager.Create3DRadars", "Created radars", "count=" + created, "D");
-            // #endregion
             Debug.Log("[CueRadarManager] Created 4/4 radars.");
         }
 
@@ -430,13 +421,9 @@ namespace OrchestraMaestro
 
         #region Cue Management
 
-        private static int cueCheckLogCount = 0;
         private void CheckUpcomingCues()
         {
             if (rhythmMap == null) return;
-            // #region agent log
-            if (cueCheckLogCount < 3) { cueCheckLogCount++; Debug.LogError($"[DBG] CheckUpcomingCues: rhythmMap.IsPlaying={rhythmMap.IsPlaying}, radarsSpawned={radarsSpawned}, radars3D=[{(radars3D[0]!=null?1:0)},{(radars3D[1]!=null?1:0)},{(radars3D[2]!=null?1:0)},{(radars3D[3]!=null?1:0)}]"); }
-            // #endregion
             
             // Get cues within lead time window
             var upcomingCues = rhythmMap.GetUpcomingCues(cueLeadTime);
@@ -500,10 +487,6 @@ namespace OrchestraMaestro
             }
             else
             {
-                // #region agent log
-                var r3 = ""; for (int i = 0; i < 4; i++) r3 += (radars3D[i] != null ? "1" : "0"); var r2 = ""; for (int i = 0; i < 4; i++) r2 += (radars[i] != null ? "1" : "0");
-                DebugLog.Log("CueRadarManager.ShowNextCue", "radar null", "section=" + sectionIndex + " radars3D=" + r3 + " radars=" + r2, "E");
-                // #endregion
                 Debug.LogError($"[CueRadarManager] Radar {sectionIndex} is null!");
             }
         }
@@ -629,10 +612,6 @@ namespace OrchestraMaestro
         /// </summary>
         public void ResetForNewGame()
         {
-            // #region agent log
-            int r3d = 0, r2d = 0; for (int i = 0; i < 4; i++) { if (radars3D[i] != null) r3d++; if (radars[i] != null) r2d++; }
-            DebugLog.Log("CueRadarManager.ResetForNewGame", "Reset", "radars3D=" + r3d + " radars=" + r2d + " radarsSpawned=" + radarsSpawned, "C");
-            // #endregion
             // Clear cue queues and active cues
             for (int i = 0; i < 4; i++)
             {
