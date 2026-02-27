@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using System.Collections.Generic;
@@ -52,6 +53,9 @@ public class OrchestraPlacement : MonoBehaviour
     private Dictionary<OrchestraSection, GameObject> sectionPlacedMember = new Dictionary<OrchestraSection, GameObject>();
     // Track which section each placed member belongs to
     private Dictionary<GameObject, OrchestraSection> memberToSection = new Dictionary<GameObject, OrchestraSection>();
+
+    // Tutorial dialog steps (only in Tutorial mode)
+    private int tutorialStep = 0;
     
     // Gameplay HUD state
     private string lastJudgement = "";
@@ -70,6 +74,7 @@ public class OrchestraPlacement : MonoBehaviour
     private GUIStyle hudBoxStyle;
     private GUIStyle gesturePromptStyle;
     private bool stylesInitialized = false;
+    private Vector2 placementScrollPos;
     
     // Persist textures so GC doesn't destroy them
     private Texture2D texDarkBg;
@@ -101,6 +106,24 @@ public class OrchestraPlacement : MonoBehaviour
             raycastManager = FindObjectOfType<ARRaycastManager>();
         if (planeManager == null)
             planeManager = FindObjectOfType<ARPlaneManager>();
+
+        // Tutorial: ensure dialog controller exists and show welcome
+        if (GameSettings.CurrentMode == GameMode.Tutorial && tutorialStep == 0)
+        {
+            EnsureTutorialDialogController();
+            TutorialDialogController.Instance?.Show(
+                "Welcome! Let's set up your orchestra. Tap a plane to place each musician, or use Auto Place for quick setup.",
+                () => tutorialStep = 1);
+        }
+    }
+
+    private void EnsureTutorialDialogController()
+    {
+        if (TutorialDialogController.Instance == null)
+        {
+            var go = new GameObject("TutorialDialogController");
+            go.AddComponent<TutorialDialogController>();
+        }
     }
     
     void OnDestroy()
@@ -227,7 +250,7 @@ public class OrchestraPlacement : MonoBehaviour
         
         GameObject member = Instantiate(prefab, finalPosition, finalRotation);
         // Use the scale specified in the prefab instead of the script override
-        member.transform.localScale = prefab.transform.localScale * 0.75f;
+        member.transform.localScale = prefab.transform.localScale * 0.6f;
         
         // Correct for off-center mesh geometry in FBX models:
         // Calculate the visual center offset from the renderers' bounds and shift the object
@@ -337,7 +360,7 @@ public class OrchestraPlacement : MonoBehaviour
 
         Quaternion finalRotation = rotation * prefab.transform.rotation;
         GameObject member = Instantiate(prefab, position, finalRotation);
-        member.transform.localScale = prefab.transform.localScale * 0.75f;
+        member.transform.localScale = prefab.transform.localScale * 0.6f;
 
         Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
         if (renderers.Length > 0)
@@ -967,7 +990,12 @@ public class OrchestraPlacement : MonoBehaviour
         GUILayout.BeginArea(new Rect(10, 10, panelW, panelH), hudBoxStyle);
         
         GUILayout.Label("🎵 ORCHESTRA SETUP", headerStyle);
-        GUILayout.Space(6);
+        if (GUILayout.Button("← Exit to Menu", buttonStyle))
+            SceneManager.LoadScene("StartScreen");
+        GUILayout.Space(4);
+
+        placementScrollPos = GUILayout.BeginScrollView(placementScrollPos, GUILayout.Height(panelH - 80));
+        GUILayout.Space(4);
         
         // Status line
         int placedCount = sectionPlacedMember.Count;
@@ -1012,8 +1040,6 @@ public class OrchestraPlacement : MonoBehaviour
         
         GUILayout.Space(8);
         
-        if (GUILayout.Button("↩ Undo Last", buttonStyle))
-            UndoLastPlacement();
         if (GUILayout.Button("✕ Clear All", buttonStyle))
             ClearAllPlacements();
         if (GUILayout.Button("🔄 Rescan Planes", buttonStyle))
@@ -1037,10 +1063,19 @@ public class OrchestraPlacement : MonoBehaviour
         if (GUILayout.Button(lockLabel, buttonStyle, GUILayout.Height(30)))
             LockPlacements();
         GUI.enabled = true;
+
+        // Tutorial: preLock hint when all 4 placed (show once)
+        if (GameSettings.CurrentMode == GameMode.Tutorial && placedCount >= 4 && tutorialStep == 1)
+        {
+            EnsureTutorialDialogController();
+            TutorialDialogController.Instance?.Show("Great! Tap START GAME to lock placements and pick a song.");
+            tutorialStep = 2;
+        }
         
         GUILayout.Space(4);
         GUILayout.Label("<i>Tap a plane to place</i>", labelStyle);
         
+        GUILayout.EndScrollView();
         GUILayout.EndArea();
     }
     
@@ -1111,6 +1146,25 @@ public class OrchestraPlacement : MonoBehaviour
             float jY = Screen.height / 3f * 0.35f; // upper third
             GUI.Label(new Rect(jX, jY, jW, jH), lastJudgement, judgementStyle);
         }
+
+        // Tutorial: paused - perform gesture
+        if (RhythmGameController.Instance != null && RhythmGameController.Instance.IsTutorialPaused)
+        {
+            headerStyle.normal.textColor = new Color(1f, 0.9f, 0.5f);
+            GUI.Label(new Rect((Screen.width / 3f - 200f) / 2f, Screen.height / 3f * 0.25f, 200f, 30f), "Perform the gesture!", headerStyle);
+        }
+
+        // Tutorial: wrong gesture hint
+        string wrongHint = RhythmGameController.Instance?.TutorialWrongGestureHint;
+        if (!string.IsNullOrEmpty(wrongHint))
+        {
+            judgementStyle.normal.textColor = new Color(1f, 0.6f, 0.3f);
+            float hW = 280f;
+            float hH = 50f;
+            float hX = (Screen.width / 3f - hW) / 2f;
+            float hY = Screen.height / 3f * 0.5f;
+            GUI.Label(new Rect(hX, hY, hW, hH), wrongHint, labelStyle);
+        }
         
         // Bottom-left: small unlock button
         if (GUI.Button(new Rect(10, Screen.height / 3f - 35, 70, 22), "✎ Edit", buttonStyle))
@@ -1123,6 +1177,14 @@ public class OrchestraPlacement : MonoBehaviour
     {
         var ctrl = RhythmGameController.Instance;
         if (ctrl == null) return;
+
+        // Tutorial: song selection hint (show once)
+        if (GameSettings.CurrentMode == GameMode.Tutorial && tutorialStep == 2)
+        {
+            EnsureTutorialDialogController();
+            TutorialDialogController.Instance?.Show("Choose a song to conduct. Tap one to begin.");
+            tutorialStep = 3;
+        }
 
         float panelW = 220f;
         float panelH = 320f;
@@ -1164,7 +1226,7 @@ public class OrchestraPlacement : MonoBehaviour
         if (ctrl == null) return;
         
         float panelW = 200f;
-        float panelH = 260f;
+        float panelH = 300f;
         float centerX = (Screen.width / 3f - panelW) / 2f;
         float centerY = (Screen.height / 3f - panelH) / 2f;
         
@@ -1193,6 +1255,12 @@ public class OrchestraPlacement : MonoBehaviour
         if (GUILayout.Button("✎ Edit Placement", buttonStyle))
         {
             UnlockPlacements();
+        }
+
+        GUILayout.Space(4);
+        if (GUILayout.Button("← Return to Main Menu", buttonStyle))
+        {
+            SceneManager.LoadScene("StartScreen");
         }
         
         GUILayout.EndArea();
