@@ -53,6 +53,9 @@ namespace OrchestraMaestro
         /// <summary>Number of remaining cues</summary>
         public int RemainingCues => cues.Count - nextCueIndex;
 
+        /// <summary>Timestamp of the first cue in the map, or float.MaxValue if no cues.</summary>
+        public float FirstCueTimestamp => cues.Count > 0 ? cues[0].timestamp : float.MaxValue;
+
         #region Map Loading
 
         /// <summary>
@@ -192,6 +195,16 @@ namespace OrchestraMaestro
         public void ResumeFromTutorial()
         {
             isPausedForTutorial = false;
+        }
+
+        /// <summary>Seek playback to a given time in seconds. Keeps playback running.</summary>
+        public void SeekTo(float time)
+        {
+            time = Mathf.Max(0, time);
+            songStartDspTime = AudioSettings.dspTime - time;
+            // If we seeked past any cues, advance nextCueIndex
+            while (nextCueIndex < cues.Count && cues[nextCueIndex].timestamp < time)
+                nextCueIndex++;
         }
 
         #endregion

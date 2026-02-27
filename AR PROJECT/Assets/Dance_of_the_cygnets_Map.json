@@ -1,0 +1,110 @@
+{
+  "cues": [
+
+    {
+      "timestamp": 12.47,
+      "gestureId": "UP",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 16.53,
+      "gestureId": "DOWN",
+      "section": "flute"
+    },
+    {
+      "timestamp": 20.55,
+      "gestureId": "PUNCH",
+      "section": "drum"
+    },
+    {
+      "timestamp": 24.66,
+      "gestureId": "UP",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 28.77,
+      "gestureId": "DOWN",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 32.88,
+      "gestureId": "PUNCH",
+      "section": "flute"
+    },
+    {
+      "timestamp": 37.04,
+      "gestureId": "UP",
+      "section": "drum"
+    },
+    {
+      "timestamp": 41.22,
+      "gestureId": "DOWN",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 45.33,
+      "gestureId": "PUNCH",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 49.39,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 53.71,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 57.89,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 62.0,
+      "gestureId": "UP",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 66.22,
+      "gestureId": "DOWN",
+      "section": "flute"
+    },
+    {
+      "timestamp": 70.5,
+      "gestureId": "PUNCH",
+      "section": "drum"
+    },
+    {
+      "timestamp": 74.79,
+      "gestureId": "UP",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 78.99,
+      "gestureId": "DOWN",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 83.27,
+      "gestureId": "PUNCH",
+      "section": "flute"
+    },
+    {
+      "timestamp": 87.28,
+      "gestureId": "UP",
+      "section": "drum"
+    },
+    {
+      "timestamp": 91.58,
+      "gestureId": "DOWN",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 95.64,
+      "gestureId": "PUNCH",
+      "section": "xylophone"
+    }
+  ]
+}

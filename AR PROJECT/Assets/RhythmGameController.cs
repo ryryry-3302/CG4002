@@ -64,6 +64,9 @@ namespace OrchestraMaestro
         public string TutorialWrongGestureHint { get; private set; }
         /// <summary>Tutorial: whether playback is paused waiting for user gesture.</summary>
         public bool IsTutorialPaused => rhythmMap != null && rhythmMap.IsPausedForTutorial;
+
+        /// <summary>Current playback time in seconds. 0 if no map.</summary>
+        public float CurrentSongTime => rhythmMap != null ? rhythmMap.CurrentSongTime : 0f;
         private float tutorialWrongGestureTime;
 
         #region Unity Lifecycle
@@ -470,6 +473,31 @@ namespace OrchestraMaestro
 
         /// <summary>Songs available in the selection menu. Null/empty uses test map.</summary>
         public SongData[] AvailableSongs => availableSongs;
+
+        /// <summary>Currently selected/playing song. Null if none.</summary>
+        public SongData CurrentSong => currentSong;
+
+        /// <summary>Skip to 5 seconds before the first cue. Only valid when first cue is at or after 20s and we're before it.</summary>
+        public void SkipToFirstCueMinus5()
+        {
+            if (currentState != GameState.Playing || rhythmMap == null) return;
+            float firstCue = rhythmMap.FirstCueTimestamp;
+            if (firstCue >= 20f && rhythmMap.CurrentSongTime < firstCue)
+            {
+                float target = Mathf.Max(0, firstCue - 5f);
+                rhythmMap.SeekTo(target);
+                if (audioSource != null && audioSource.isPlaying)
+                    audioSource.time = target;
+                Debug.Log($"[RhythmGameController] Skipped to {target:F1}s (5s before first cue at {firstCue:F1}s)");
+            }
+        }
+
+        /// <summary>True if the song has no cue in the first 20s and we're still in that window (skip button can show).</summary>
+        public bool CanSkipToFirstCue =>
+            currentState == GameState.Playing
+            && rhythmMap != null
+            && rhythmMap.FirstCueTimestamp >= 20f
+            && rhythmMap.CurrentSongTime < 20f;
 
 
         #endregion

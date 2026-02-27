@@ -62,6 +62,10 @@ public class OrchestraPlacement : MonoBehaviour
     private Color lastJudgementColor = Color.white;
     private float judgementTimer = 0f;
     private float judgementDisplayTime = 1.0f;
+
+    // Section animation: play for this long after a correct cue (seconds)
+    private const float SectionPlayDuration = 10f;
+    private Dictionary<OrchestraSection, float> sectionAnimationEndTime = new Dictionary<OrchestraSection, float>();
     
     // Custom GUI styles (lazy-initialized)
     private GUIStyle headerStyle;
@@ -75,6 +79,10 @@ public class OrchestraPlacement : MonoBehaviour
     private GUIStyle gesturePromptStyle;
     private bool stylesInitialized = false;
     private Vector2 placementScrollPos;
+
+    // Song list scrolling text (LED-style when label doesn't fit)
+    private const float SongScrollSpeed = 35f;   // pixels per second
+    private const float SongScrollGap = 50f;     // gap before text repeats
     
     // Persist textures so GC doesn't destroy them
     private Texture2D texDarkBg;
@@ -142,6 +150,28 @@ public class OrchestraPlacement : MonoBehaviour
         // Tick judgement display timer
         if (judgementTimer > 0)
             judgementTimer -= Time.deltaTime;
+
+        // When in game: stop section animations after SectionPlayDuration
+        if (!isPlacementMode && sectionAnimationEndTime.Count > 0)
+        {
+            float now = Time.time;
+            var toRemove = new List<OrchestraSection>();
+            foreach (var kv in sectionAnimationEndTime)
+            {
+                if (now >= kv.Value)
+                {
+                    toRemove.Add(kv.Key);
+                    if (sectionPlacedMember.TryGetValue(kv.Key, out GameObject member) && member != null)
+                    {
+                        var anim = member.GetComponent<Animator>();
+                        if (anim != null)
+                            anim.speed = 0f;
+                    }
+                }
+            }
+            foreach (var sec in toRemove)
+                sectionAnimationEndTime.Remove(sec);
+        }
         
         if (!isPlacementMode) return;
         
@@ -495,6 +525,9 @@ public class OrchestraPlacement : MonoBehaviour
         // Subscribe to game events for HUD
         Invoke(nameof(SubscribeGameHUD), 0.2f);
         
+        // Make characters static until a correct cue triggers their animation
+        SetAllSectionAnimatorsSpeed(0f);
+        
         // Notify listeners that placements are locked
         OnPlacementsLocked?.Invoke();
         Debug.Log("[OrchestraPlacement] Placements locked - ready to start game");
@@ -525,6 +558,19 @@ public class OrchestraPlacement : MonoBehaviour
                 lastJudgement = "MISS";
                 lastJudgementColor = new Color(1f, 0.35f, 0.35f);
                 break;
+        }
+
+        // Play this section's character animation for SectionPlayDuration on Perfect/Good
+        if (result.judgement == JudgementType.Perfect || result.judgement == JudgementType.Good)
+        {
+            OrchestraSection section = result.targetSection;
+            sectionAnimationEndTime[section] = Time.time + SectionPlayDuration;
+            if (sectionPlacedMember.TryGetValue(section, out GameObject member) && member != null)
+            {
+                var anim = member.GetComponent<Animator>();
+                if (anim != null)
+                    anim.speed = 1f;
+            }
         }
     }
 
@@ -567,6 +613,10 @@ public class OrchestraPlacement : MonoBehaviour
         // Clear section highlights
         ClearHighlight();
         
+        // Restore animator speed when returning to placement
+        SetAllSectionAnimatorsSpeed(1f);
+        sectionAnimationEndTime.Clear();
+        
         Debug.Log("[OrchestraPlacement] Unlocked - back to placement mode");
     }
 
@@ -596,6 +646,18 @@ public class OrchestraPlacement : MonoBehaviour
         {
             SetSectionHighlight(currentHighlightedSection, false);
             currentHighlightedSection = -1;
+        }
+    }
+
+    /// <summary>Set Animator.speed on all placed section members (0 = static, 1 = playing)</summary>
+    private void SetAllSectionAnimatorsSpeed(float speed)
+    {
+        foreach (var kv in sectionPlacedMember)
+        {
+            if (kv.Value == null) continue;
+            var anim = kv.Value.GetComponent<Animator>();
+            if (anim != null)
+                anim.speed = speed;
         }
     }
     
@@ -1099,40 +1161,58 @@ public class OrchestraPlacement : MonoBehaviour
         float hudW = 160f;
         float hudH = 155f;
         
-        // Top-center: Score + Combo
-        float centerX = (Screen.width / 3f - hudW) / 2f; // account for 3x GUI scale
-        GUILayout.BeginArea(new Rect(centerX, 8, hudW, hudH), hudBoxStyle);
-        
+        // Top: song title + player time (and optional skip button)
+        var ctrl = RhythmGameController.Instance;
+        float topY = 8f;
+        float topH = 42f;  // Taller to fit long song titles
+        float topW = 280f;
+        string songTitle = ctrl?.CurrentSong != null ? ctrl.CurrentSong.songName : "—";
+        float t = ctrl != null ? ctrl.CurrentSongTime : 0f;
+        int mins = Mathf.FloorToInt(t / 60f);
+        int secs = Mathf.FloorToInt(t % 60f);
+        string timeStr = $"{mins}:{secs:D2}";
+        labelStyle.normal.textColor = new Color(0.75f, 0.8f, 0.9f);
+        labelStyle.wordWrap = true;
+        GUI.Label(new Rect(10, topY, topW, topH), $"{songTitle}  {timeStr}", labelStyle);
+        labelStyle.wordWrap = false;
+        if (ctrl != null && ctrl.CanSkipToFirstCue)
+        {
+            if (GUI.Button(new Rect(Screen.width / 3f - 130, topY, 120, 28), "⏩ Skip to first cue", buttonStyle))
+                ctrl.SkipToFirstCueMinus5();
+        }
+
+        // Top-center: Score + Combo (use fixed Rects to avoid GUILayout control-count mismatch)
+        float centerX = (Screen.width / 3f - hudW) / 2f;
+        Rect scoreRect = new Rect(centerX, 54f, hudW, hudH);  // Below taller song title bar
+        GUI.BeginGroup(scoreRect, hudBoxStyle);
+        float y = 10f;
         int score = RhythmGameController.Instance?.TotalScore ?? 0;
         int combo = RhythmGameController.Instance?.Combo ?? 0;
         
-        GUILayout.Label(score.ToString("N0"), scoreStyle);
+        GUI.Label(new Rect(0, y, hudW, 22), score.ToString("N0"), scoreStyle);
+        y += 24f;
         
         if (combo > 1)
-        {
-            GUILayout.Label($"{combo}x COMBO", comboStyle);
-        }
+            GUI.Label(new Rect(0, y, hudW, 18), $"{combo}x COMBO", comboStyle);
+        y += 22f;
         
-        // Current target section
         string sectionName = RhythmGameController.Instance?.SelectedSection.ToString() ?? "---";
-        GUILayout.Label($"▸ {sectionName}", sectionLabelStyle);
+        GUI.Label(new Rect(0, y, hudW, 18), $"▸ {sectionName}", sectionLabelStyle);
+        y += 22f;
         
-        // Incoming gesture name with timing color + section in brackets
         var cueInfo = CueRadarManager.Instance?.GetCurrentActiveGesture() ?? (null, null, Color.white);
         if (cueInfo.gestureName != null)
         {
             gesturePromptStyle.normal.textColor = cueInfo.timingColor;
-            GUILayout.Label(cueInfo.gestureName, gesturePromptStyle);
-            
+            GUI.Label(new Rect(0, y, hudW, 18), cueInfo.gestureName, gesturePromptStyle);
+            y += 20f;
             sectionLabelStyle.normal.textColor = cueInfo.timingColor;
-            GUILayout.Label($"[{cueInfo.sectionName}]", sectionLabelStyle);
-            // Reset section label color
+            GUI.Label(new Rect(0, y, hudW, 18), $"[{cueInfo.sectionName}]", sectionLabelStyle);
             sectionLabelStyle.normal.textColor = new Color(0.6f, 0.8f, 1f);
         }
+        GUI.EndGroup();
         
-        GUILayout.EndArea();
-        
-        // Center: Judgement feedback (floating)
+        // Bottom-center: Judgement feedback (Perfect / Good / Miss) with black outline
         if (judgementTimer > 0)
         {
             float alpha = Mathf.Clamp01(judgementTimer / 0.3f); // fade out in last 0.3s
@@ -1143,8 +1223,17 @@ public class OrchestraPlacement : MonoBehaviour
             float jW = 200f;
             float jH = 40f;
             float jX = (Screen.width / 3f - jW) / 2f;
-            float jY = Screen.height / 3f * 0.35f; // upper third
-            GUI.Label(new Rect(jX, jY, jW, jH), lastJudgement, judgementStyle);
+            float jY = Screen.height / 3f - 55f;  // Bottom centre of HUD
+            Rect jRect = new Rect(jX, jY, jW, jH);
+            // Black outline (8 directions for clean edge)
+            judgementStyle.normal.textColor = new Color(0, 0, 0, alpha);
+            for (int ox = -1; ox <= 1; ox++)
+                for (int oy = -1; oy <= 1; oy++)
+                    if (ox != 0 || oy != 0)
+                        GUI.Label(new Rect(jRect.x + ox, jRect.y + oy, jW, jH), lastJudgement, judgementStyle);
+            // Colored text on top
+            judgementStyle.normal.textColor = col;
+            GUI.Label(jRect, lastJudgement, judgementStyle);
         }
 
         // Tutorial: paused - perform gesture
@@ -1186,7 +1275,7 @@ public class OrchestraPlacement : MonoBehaviour
             tutorialStep = 3;
         }
 
-        float panelW = 220f;
+        float panelW = 280f;  // Wider for long song names
         float panelH = 320f;
         float centerX = (Screen.width / 3f - panelW) / 2f;
         float centerY = (Screen.height / 3f - panelH) / 2f;
@@ -1198,18 +1287,41 @@ public class OrchestraPlacement : MonoBehaviour
         var songs = ctrl.AvailableSongs;
         if (songs != null && songs.Length > 0)
         {
-            foreach (var song in songs)
+            float btnH = 36f;
+            float btnY = 12f + 24f + 12f;  // below header + space
+            float btnW = panelW - 24f;     // padding
+            for (int i = 0; i < songs.Length; i++)
             {
+                var song = songs[i];
                 if (song == null) continue;
                 string label = string.IsNullOrEmpty(song.artistName)
                     ? song.songName
                     : $"{song.songName} — {song.artistName}";
-                if (GUILayout.Button(label, buttonStyle, GUILayout.Height(36)))
+                Rect btnRect = new Rect(12, btnY, btnW, btnH);
+                if (GUI.Button(btnRect, ""))
                 {
                     ctrl.SelectSongAndStart(song);
                 }
+                // Draw scrolling text when it doesn't fit (LED-style)
+                float textW = buttonStyle.CalcSize(new GUIContent(label)).x;
+                GUI.BeginGroup(btnRect);
+                if (textW > btnW - 16f)
+                {
+                    float cycle = textW + SongScrollGap;
+                    float offset = (Time.time * SongScrollSpeed) % cycle;
+                    float textX = btnW - textW - offset;  // Start from right, scroll left
+                    Rect textRect = new Rect(textX, 0, textW + cycle, btnH);
+                    GUI.Label(textRect, label, buttonStyle);
+                }
+                else
+                {
+                    GUI.Label(new Rect(0, 0, btnW, btnH), label, buttonStyle);
+                }
+                GUI.EndGroup();
+                btnY += btnH + 4f;
             }
-            GUILayout.Space(8);
+            float reservedH = btnY - (12f + 24f + 12f) + 8f;
+            GUILayout.Space(Mathf.Max(8, reservedH));  // Reserve space so Back button doesn't overlap
         }
 
         GUILayout.Space(12);
