@@ -26,10 +26,12 @@ public class BatonSparkleEffect : MonoBehaviour
     private ParticleSystem sparkleParticles;
     private ParticleSystem burstParticles;
     private ParticleSystem.EmissionModule emissionModule;
+    private ParticleSystem.ColorOverLifetimeModule sparkleColorOverLifetime;
     private Vector3 lastTipPosition;
     private float currentEmissionRate;
     private float movementSpeed;
     private bool hasLastPosition;
+    private int lastComboForTrail = -1;
 
     private void Awake()
     {
@@ -70,6 +72,7 @@ public class BatonSparkleEffect : MonoBehaviour
         }
 
         emissionModule = sparkleParticles.emission;
+        sparkleColorOverLifetime = sparkleParticles.colorOverLifetime;
 
         // Burst effect system for gesture feedback
         var burstGo = sparkleParticles.transform.Find("Burst");
@@ -213,10 +216,70 @@ public class BatonSparkleEffect : MonoBehaviour
 
         emissionModule.rateOverTime = currentEmissionRate;
 
+        // Update trail color based on combo (10x = red, 20x+ = purple gradient)
+        int combo = RhythmGameController.Instance?.Combo ?? 0;
+        if (combo != lastComboForTrail)
+        {
+            lastComboForTrail = combo;
+            ApplyComboTrailColors(combo);
+        }
+
         if (currentEmissionRate < 0.5f && sparkleParticles.isPlaying)
             sparkleParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         else if (currentEmissionRate >= 0.5f && !sparkleParticles.isPlaying)
             sparkleParticles.Play();
+    }
+
+    private Color GetFlyingSparkleColor(JudgementType judgement, int combo)
+    {
+        if (combo >= 20)
+            return new Color(0.9f, 0.45f, 1f);
+        if (combo >= 10)
+            return new Color(1f, 0.3f, 0.25f);
+        return judgement == JudgementType.Perfect
+            ? new Color(1f, 0.9f, 0.4f)
+            : new Color(1f, 1f, 0.95f);
+    }
+
+    private void ApplyComboTrailColors(int combo)
+    {
+        if (sparkleParticles == null) return;
+        var main = sparkleParticles.main;
+        var grad = new Gradient();
+        if (combo >= 20)
+        {
+            // 20x+: pretty purple gradient (violet -> magenta -> deep purple)
+            main.startColor = new Color(0.85f, 0.4f, 1f, 0.95f);
+            grad.SetKeys(
+                new[] {
+                    new GradientColorKey(new Color(0.6f, 0.2f, 1f), 0f),
+                    new GradientColorKey(new Color(0.9f, 0.4f, 1f), 0.35f),
+                    new GradientColorKey(new Color(1f, 0.3f, 0.8f), 0.65f),
+                    new GradientColorKey(new Color(0.5f, 0.1f, 0.7f), 1f)
+                },
+                new[] { new GradientAlphaKey(0.95f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
+        }
+        else if (combo >= 10)
+        {
+            // 10x: red
+            main.startColor = new Color(1f, 0.25f, 0.2f, 0.95f);
+            grad.SetKeys(
+                new[] {
+                    new GradientColorKey(new Color(1f, 0.4f, 0.35f), 0f),
+                    new GradientColorKey(new Color(1f, 0.2f, 0.15f), 0.5f),
+                    new GradientColorKey(new Color(0.8f, 0.1f, 0.1f), 1f)
+                },
+                new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
+        }
+        else
+        {
+            // Default: warm gold/white
+            main.startColor = new Color(1f, 0.95f, 0.8f, 0.9f);
+            grad.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.9f, 0.5f), 0.5f), new GradientColorKey(new Color(1f, 0.85f, 0.4f), 1f) },
+                new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
+        }
+        sparkleColorOverLifetime.color = grad;
     }
 
     private void OnGestureJudged(ScoringResult result)
@@ -280,20 +343,21 @@ public class BatonSparkleEffect : MonoBehaviour
         {
             Vector3? targetPos = OrchestraPlacement.Instance.GetSectionCenterOfMass(result.targetSection);
             if (targetPos.HasValue)
-                StartCoroutine(SpawnFlyingSparkle(pos, targetPos.Value, result.judgement));
+            {
+                int combo = RhythmGameController.Instance?.Combo ?? 0;
+                StartCoroutine(SpawnFlyingSparkle(pos, targetPos.Value, result.judgement, combo));
+            }
         }
     }
 
-    private IEnumerator SpawnFlyingSparkle(Vector3 from, Vector3 to, JudgementType judgement)
+    private IEnumerator SpawnFlyingSparkle(Vector3 from, Vector3 to, JudgementType judgement, int combo)
     {
         Vector3 dir = (to - from);
         float dist = dir.magnitude;
         if (dist < 0.01f) yield break;
         dir /= dist;
 
-        Color sparkleColor = judgement == JudgementType.Perfect
-            ? new Color(1f, 0.9f, 0.4f)
-            : new Color(1f, 1f, 0.95f);
+        Color sparkleColor = GetFlyingSparkleColor(judgement, combo);
 
         var go = new GameObject("FlyingSparkle");
         go.transform.position = from;

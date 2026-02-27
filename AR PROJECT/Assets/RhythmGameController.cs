@@ -79,13 +79,36 @@ namespace OrchestraMaestro
                 return;
             }
             Instance = this;
+            
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
         }
 
         private void Start()
         {
-            // Subscribe to MQTT events
+            BindReferences();
+        }
+        
+        private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            // Re-acquire references after scene reload (this object survives via DontDestroyOnLoad on its GameObject)
+            BindReferences();
+            ResetToSetup();
+            Debug.Log($"[RhythmGameController] Scene '{scene.name}' loaded — re-bound references, reset to Setup");
+        }
+        
+        private void BindReferences()
+        {
+            // Always re-find to handle scene reload (serialized refs become stale)
+            orchestraPlacement = FindObjectOfType<OrchestraPlacement>();
+            rhythmMap = FindObjectOfType<RhythmMap>();
+            hudController = FindObjectOfType<HUDController>();
+            audioSource = GetComponent<AudioSource>();
+            
+            // Subscribe to MQTT events (MQTTManager also persists, so -= first)
             if (MQTTManager.Instance != null)
             {
+                MQTTManager.Instance.OnGestureReceived -= HandleGestureReceived;
+                MQTTManager.Instance.OnDownstroke -= HandleDownstroke;
                 MQTTManager.Instance.OnGestureReceived += HandleGestureReceived;
                 MQTTManager.Instance.OnDownstroke += HandleDownstroke;
             }
@@ -93,6 +116,10 @@ namespace OrchestraMaestro
             // Subscribe to rhythm map events
             if (rhythmMap != null)
             {
+                rhythmMap.OnCueMissed -= HandleCueMissed;
+                rhythmMap.OnCueAutoHit -= HandleCueAutoHit;
+                rhythmMap.OnSongFinished -= HandleSongFinished;
+                rhythmMap.OnTutorialPauseRequested -= HandleTutorialPauseRequested;
                 rhythmMap.OnCueMissed += HandleCueMissed;
                 rhythmMap.OnCueAutoHit += HandleCueAutoHit;
                 rhythmMap.OnSongFinished += HandleSongFinished;
@@ -102,12 +129,9 @@ namespace OrchestraMaestro
             // Subscribe to orchestra placement lock event
             if (orchestraPlacement != null)
             {
+                orchestraPlacement.OnPlacementsLocked -= HandlePlacementsLocked;
                 orchestraPlacement.OnPlacementsLocked += HandlePlacementsLocked;
             }
-
-            // Only auto-start if autoStartTestMap is enabled AND we don't need to wait for placement
-            // (For testing without AR, set autoStartTestMap = true)
-            // For normal AR flow, leave it unchecked and game starts when you lock placements
         }
 
         private void HandlePlacementsLocked()
@@ -124,6 +148,8 @@ namespace OrchestraMaestro
 
         private void OnDestroy()
         {
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+            
             if (MQTTManager.Instance != null)
             {
                 MQTTManager.Instance.OnGestureReceived -= HandleGestureReceived;
@@ -271,6 +297,15 @@ namespace OrchestraMaestro
             missCount = 0;
 
             OnScoreChanged?.Invoke(totalScore, combo);
+        }
+
+        /// <summary>Force reset to Setup state. Call when exiting to menu so next game starts fresh.</summary>
+        public void ResetToSetup()
+        {
+            currentState = GameState.Setup;
+            ResetScore();
+            OnGameStateChanged?.Invoke(GameState.Setup);
+            Debug.Log("[RhythmGameController] Reset to Setup");
         }
 
         #endregion

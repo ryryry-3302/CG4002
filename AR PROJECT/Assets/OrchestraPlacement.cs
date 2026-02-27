@@ -38,12 +38,6 @@ public class OrchestraPlacement : MonoBehaviour
     private List<GameObject> placedMembers = new List<GameObject>();
     private int selectedIndex = 0;
     private bool isPlacementMode = true;
-    private bool scanningPaused = false;
-    
-    // GUI interaction guard - prevents placement when tapping buttons
-    private bool guiConsumedInput = false;
-    private Rect guiAreaScreenRect; // The actual screen-pixel rect of the OnGUI panel
-    
     // Section grouping for conducting game
     private List<GameObject>[] sectionMembers = new List<GameObject>[4];
     private int currentHighlightedSection = -1;
@@ -174,40 +168,6 @@ public class OrchestraPlacement : MonoBehaviour
         }
         
         if (!isPlacementMode) return;
-        
-        // If OnGUI consumed input this frame, skip placement
-        if (guiConsumedInput)
-        {
-            guiConsumedInput = false;
-            return;
-        }
-        
-        // Check for touch input
-        if (Input.touchCount > 0)
-        {
-            Touch touch = Input.GetTouch(0);
-            
-            // Only place on tap (not drag)
-            if (touch.phase == TouchPhase.Began)
-            {
-                // Ignore if touching the GUI panel area
-                if (IsInsideGUIArea(touch.position))
-                    return;
-                
-                TryPlaceObject(touch.position);
-            }
-        }
-        
-        // Mouse input for testing in editor
-        if (Input.GetMouseButtonDown(0))
-        {
-            Vector2 mousePos = Input.mousePosition;
-            // Ignore GUI panel area
-            if (IsInsideGUIArea(mousePos))
-                return;
-                
-            TryPlaceObject(mousePos);
-        }
     }
     
     void LateUpdate()
@@ -215,26 +175,6 @@ public class OrchestraPlacement : MonoBehaviour
         UpdateSelectorHalo();
     }
     
-    /// <summary>
-    /// Check if a screen position (Input coordinates, origin bottom-left) is inside the OnGUI panel.
-    /// OnGUI uses top-left origin and is scaled by GUI.matrix (3x), so we convert.
-    /// </summary>
-    private bool IsInsideGUIArea(Vector2 screenPos)
-    {
-        // Placement panel: Rect(10, 10, 300, 440) with GUI.matrix scale 3x
-        float guiScale = 3f;
-        float guiLeft = 10f * guiScale;
-        float guiTop = 10f * guiScale;
-        float guiWidth = 300f * guiScale;
-        float guiHeight = 440f * guiScale;
-        
-        // Convert Input screen pos (bottom-left origin) to top-left origin
-        float topLeftY = Screen.height - screenPos.y;
-        
-        return screenPos.x >= guiLeft && screenPos.x <= (guiLeft + guiWidth) &&
-               topLeftY >= guiTop && topLeftY <= (guiTop + guiHeight);
-    }
-
     void TryPlaceObject(Vector2 screenPosition)
     {
         if (raycastManager.Raycast(screenPosition, hits, TrackableType.PlaneWithinPolygon))
@@ -489,9 +429,10 @@ public class OrchestraPlacement : MonoBehaviour
         }
     }
     
-    /// <summary>Remove all tracked planes and restart plane detection from scratch</summary>
+    /// <summary>Remove all tracked planes and restart plane detection from scratch. Also clears all placements.</summary>
     public void RescanPlanes()
     {
+        ClearAllPlacements();
         // Reset the AR session which clears all trackables (planes, anchors, etc.)
         // and starts fresh detection
         var arSession = FindObjectOfType<UnityEngine.XR.ARFoundation.ARSession>();
@@ -514,6 +455,9 @@ public class OrchestraPlacement : MonoBehaviour
 
     public void LockPlacements()
     {
+        // #region agent log
+        Debug.LogError($"[DBG] LockPlacements: sectionPlacedMember.Count={sectionPlacedMember.Count}, sectionMembers counts={sectionMembers[0].Count},{sectionMembers[1].Count},{sectionMembers[2].Count},{sectionMembers[3].Count}");
+        // #endregion
         isPlacementMode = false;
         // Hide all planes when done placing
         foreach (var plane in planeManager.trackables)
@@ -574,10 +518,32 @@ public class OrchestraPlacement : MonoBehaviour
         }
     }
 
+    /// <summary>Reset game state and return to main menu.</summary>
+    public void ExitToMainMenu()
+    {
+        // #region agent log
+        DebugLog.Log("OrchestraPlacement.ExitToMainMenu", "Exit to menu", "entry", "B");
+        // #endregion
+        ClearAllPlacements();
+        if (RhythmGameController.Instance != null)
+        {
+            RhythmGameController.Instance.OnGestureJudged -= OnGestureJudgedHUD;
+            RhythmGameController.Instance.EndGame();  // Stop playback
+            RhythmGameController.Instance.ResetToSetup();  // Reset state for next game
+        }
+        if (CueRadarManager.Instance != null)
+            CueRadarManager.Instance.ResetForNewGame();
+        isPlacementMode = true;
+        SceneManager.LoadScene("StartScreen");
+    }
+
     public void UnlockPlacements()
     {
+        // #region agent log
+        DebugLog.Log("OrchestraPlacement.UnlockPlacements", "Edit pressed - UnlockPlacements", "entry", "A");
+        // #endregion
         isPlacementMode = true;
-        planeManager.enabled = !scanningPaused;
+        planeManager.enabled = true;
         
         // Show existing detected planes again
         foreach (var plane in planeManager.trackables)
@@ -1053,7 +1019,7 @@ public class OrchestraPlacement : MonoBehaviour
         
         GUILayout.Label("🎵 ORCHESTRA SETUP", headerStyle);
         if (GUILayout.Button("← Exit to Menu", buttonStyle))
-            SceneManager.LoadScene("StartScreen");
+            ExitToMainMenu();
         GUILayout.Space(4);
 
         placementScrollPos = GUILayout.BeginScrollView(placementScrollPos, GUILayout.Height(panelH - 80));
@@ -1068,51 +1034,10 @@ public class OrchestraPlacement : MonoBehaviour
         }
         GUILayout.Label($"Planes: {planeCount}  |  Placed: {placedCount}/4", labelStyle);
         
-        // Section placement status dots
-        GUILayout.BeginHorizontal();
-        for (int i = 0; i < 4; i++)
-        {
-            OrchestraSection sec = (OrchestraSection)i;
-            bool placed = sectionPlacedMember.ContainsKey(sec);
-            string dot = placed ? "<color=#44FF88>●</color>" : "<color=#555555>○</color>";
-            GUILayout.Label($"{dot} {sec}", labelStyle);
-        }
-        GUILayout.EndHorizontal();
-        
         GUILayout.Space(8);
         
-        // Current selection
-        string currentName = "None";
-        string secName = "";
-        if (orchestraPrefabs != null && orchestraPrefabs.Length > 0 && orchestraPrefabs[selectedIndex] != null)
-        {
-            currentName = orchestraPrefabs[selectedIndex].name;
-            OrchestraSection sec = GetSectionForPrefab(selectedIndex);
-            bool alreadyPlaced = sectionPlacedMember.ContainsKey(sec);
-            secName = $"[{sec}]" + (alreadyPlaced ? " ✓" : "");
-        }
-        GUILayout.Label($"Selected: {currentName}", labelStyle);
-        GUILayout.Label($"  {selectedIndex + 1}/{orchestraPrefabs?.Length ?? 0}  {secName}", labelStyle);
-        
-        GUILayout.Space(4);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("◀ Prev", buttonStyle)) SelectPreviousMember();
-        if (GUILayout.Button("Next ▶", buttonStyle)) SelectNextMember();
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(8);
-        
-        if (GUILayout.Button("✕ Clear All", buttonStyle))
-            ClearAllPlacements();
         if (GUILayout.Button("🔄 Rescan Planes", buttonStyle))
             RescanPlanes();
-
-        string scanLabel = scanningPaused ? "▶ Resume Scanning" : "⏸ Pause Scanning";
-        if (GUILayout.Button(scanLabel, buttonStyle))
-        {
-            scanningPaused = !scanningPaused;
-            planeManager.enabled = !scanningPaused;
-        }
 
         if (GUILayout.Button("✨ Auto Place", buttonStyle))
             AutoPlaceAll();
@@ -1135,7 +1060,7 @@ public class OrchestraPlacement : MonoBehaviour
         }
         
         GUILayout.Space(4);
-        GUILayout.Label("<i>Tap a plane to place</i>", labelStyle);
+        GUILayout.Label("<i>Scan the room, then tap Auto Place</i>", labelStyle);
         
         GUILayout.EndScrollView();
         GUILayout.EndArea();
@@ -1372,7 +1297,7 @@ public class OrchestraPlacement : MonoBehaviour
         GUILayout.Space(4);
         if (GUILayout.Button("← Return to Main Menu", buttonStyle))
         {
-            SceneManager.LoadScene("StartScreen");
+            ExitToMainMenu();
         }
         
         GUILayout.EndArea();
