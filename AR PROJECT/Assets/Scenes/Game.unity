@@ -578,9 +578,9 @@ MonoBehaviour:
   autoStartTestMap: 1
   comboStrokeWindow: 1
   missSfxDrum: {fileID: 8300000, guid: eeacaaec06fed25289ef5d6e7f322028, type: 3}
-  missSfxFlute: {fileID: 8300000, guid: 13c122bffb95dead8888eecb216494b8, type: 3}
-  missSfxPipe: {fileID: 8300000, guid: 8bc82199e544cc34587895aae093856f, type: 3}
-  missSfxXylophone: {fileID: 8300000, guid: ed001606ccd81f0d297f198140b5929d, type: 3}
+  missSfxFlute: {fileID: 8300000, guid: eeacaaec06fed25289ef5d6e7f322028, type: 3}
+  missSfxPipe: {fileID: 8300000, guid: eeacaaec06fed25289ef5d6e7f322028, type: 3}
+  missSfxXylophone: {fileID: 8300000, guid: eeacaaec06fed25289ef5d6e7f322028, type: 3}
   combo5xSfx: {fileID: 8300000, guid: 2eaa76044d5a0cd62aaad8419c94a449, type: 3}
   combo10xSfx: {fileID: 8300000, guid: 6c4e93e8a0c8d735c87e0e61ef4228c8, type: 3}
   combo20xSfx: {fileID: 8300000, guid: 09f918cbbe8be5820993214d79184fe3, type: 3}

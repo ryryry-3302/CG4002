@@ -33,6 +33,7 @@ public class OrchestraPlacement : MonoBehaviour
     [SerializeField] private float prefabScale = 0.5f;
     private const float AutoPlaceDistance = 1.8f;
     private const float AutoPlaceSpacing = 0.55f;
+    private const float ShiftStep = 0.25f;
     
     private List<ARRaycastHit> hits = new List<ARRaycastHit>();
     private List<GameObject> placedMembers = new List<GameObject>();
@@ -376,6 +377,37 @@ public class OrchestraPlacement : MonoBehaviour
         }
 
         Debug.Log($"[OrchestraPlacement] Auto placed 4 characters at distance {useDist:F2}m, spacing {AutoPlaceSpacing}m");
+    }
+
+    /// <summary>Shift all placed orchestra members toward the camera (up)</summary>
+    private void ShiftOrchestraUp()
+    {
+        ShiftOrchestraTowardCamera(ShiftStep);
+    }
+
+    /// <summary>Shift all placed orchestra members away from the camera (down)</summary>
+    private void ShiftOrchestraDown()
+    {
+        ShiftOrchestraTowardCamera(-ShiftStep);
+    }
+
+    private void ShiftOrchestraTowardCamera(float step)
+    {
+        if (placedMembers.Count == 0) return;
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        Vector3 camPos = cam.transform.position;
+        Vector3 avgPos = Vector3.zero;
+        foreach (var m in placedMembers) avgPos += m.transform.position;
+        avgPos /= placedMembers.Count;
+        Vector3 dir = (camPos - avgPos).normalized;
+        dir.y = 0;
+        if (dir.sqrMagnitude < 0.01f) return;
+        dir.Normalize();
+
+        foreach (var m in placedMembers)
+            m.transform.position += dir * step;
     }
 
     private void PlaceOrchestraMemberAt(Vector3 position, Quaternion rotation, OrchestraSection section, int prefabIndex)
@@ -1098,6 +1130,15 @@ public class OrchestraPlacement : MonoBehaviour
 
         if (GUILayout.Button("✨ Auto Place", buttonStyle))
             AutoPlaceAll();
+
+        GUI.enabled = placedCount > 0;
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("▲ Shift Up", buttonStyle))
+            ShiftOrchestraUp();
+        if (GUILayout.Button("▼ Shift Down", buttonStyle))
+            ShiftOrchestraDown();
+        GUILayout.EndHorizontal();
+        GUI.enabled = true;
         
         GUILayout.Space(8);
 
