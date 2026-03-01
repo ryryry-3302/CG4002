@@ -1,11 +1,6 @@
 {
   "cues": [
     {
-      "timestamp": 0.56,
-      "gestureId": "UP",
-      "section": "flute"
-    },
-    {
       "timestamp": 4.57,
       "gestureId": "DOWN",
       "section": "drum"

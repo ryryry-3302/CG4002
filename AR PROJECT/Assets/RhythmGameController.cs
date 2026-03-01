@@ -539,6 +539,8 @@ namespace OrchestraMaestro
         private void HandleCueAutoHit(ScoringResult result)
         {
             if (currentState != GameState.Playing) return;
+            // Move selector to the correct section so user sees it follow the cues
+            SelectSection(result.targetSection);
             ProcessScoringResult(result, result.gestureType);
             Debug.Log($"[RhythmGameController] Cheats auto-perfect: {result.gestureType} at {result.matchedCue?.timestamp}");
         }

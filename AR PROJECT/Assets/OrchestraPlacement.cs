@@ -410,6 +410,25 @@ public class OrchestraPlacement : MonoBehaviour
             m.transform.position += dir * step;
     }
 
+    /// <summary>Raise all placed orchestra members (world Y up)</summary>
+    private void ShiftOrchestraRaise()
+    {
+        ShiftOrchestraVertical(ShiftStep);
+    }
+
+    /// <summary>Lower all placed orchestra members (world Y down)</summary>
+    private void ShiftOrchestraLower()
+    {
+        ShiftOrchestraVertical(-ShiftStep);
+    }
+
+    private void ShiftOrchestraVertical(float step)
+    {
+        if (placedMembers.Count == 0) return;
+        foreach (var m in placedMembers)
+            m.transform.position += Vector3.up * step;
+    }
+
     private void PlaceOrchestraMemberAt(Vector3 position, Quaternion rotation, OrchestraSection section, int prefabIndex)
     {
         GameObject prefab = orchestraPrefabs[prefabIndex];
@@ -1133,10 +1152,16 @@ public class OrchestraPlacement : MonoBehaviour
 
         GUI.enabled = placedCount > 0;
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("▲ Shift Up", buttonStyle))
+        if (GUILayout.Button("▲ Closer", buttonStyle))
             ShiftOrchestraUp();
-        if (GUILayout.Button("▼ Shift Down", buttonStyle))
+        if (GUILayout.Button("▼ Further", buttonStyle))
             ShiftOrchestraDown();
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("⬆ Raise", buttonStyle))
+            ShiftOrchestraRaise();
+        if (GUILayout.Button("⬇ Lower", buttonStyle))
+            ShiftOrchestraLower();
         GUILayout.EndHorizontal();
         GUI.enabled = true;
         
@@ -1145,7 +1170,6 @@ public class OrchestraPlacement : MonoBehaviour
         // Manual placement: section selector when Auto Place is off
         if (!GameSettings.AutoPlace)
         {
-            GUILayout.Label("Select musician to place:", labelStyle);
             GUILayout.BeginHorizontal();
             string[] sectionNames = { "Drum", "Flute", "Pipe", "Xylophone" };
             for (int i = 0; i < 4; i++)
