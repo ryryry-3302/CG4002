@@ -45,12 +45,30 @@ public class BatonTracker : MonoBehaviour
     public bool IsTracking { get; private set; }
     public float TrackingConfidence { get; private set; }
 
+    // Exposed for occlusion mask
+    public Rect BlobScreenRect { get; private set; }
+    public Vector2 BlobCentroidScreen { get; private set; }
+    public int BlobPixelCount { get; private set; }
+    public int DownscaledWidth { get; private set; }
+    public int DownscaledHeight { get; private set; }
+    public bool[] GreenGrid => greenGrid;
+    public int GreenGridWidth => DownscaledWidth;
+    public int GreenGridHeight => DownscaledHeight;
+
+    // Baton axis endpoints in screen-space (full resolution pixels)
+    public Vector2 BlobTipScreen { get; private set; }
+    public Vector2 BlobBaseScreen { get; private set; }
+
     private bool trackingEnabled;
     private Camera arCamera;
     private int frameCounter;
     private Vector2 smoothedScreenPos;
     private Vector2 smoothVelocity;
     private bool hasValidPosition;
+
+    // Image-to-screen mapping (accounts for crop/letterbox)
+    private float imgToScreenScaleX, imgToScreenScaleY;
+    private float imgToScreenOffsetX, imgToScreenOffsetY;
 
     // Reusable buffers to avoid allocations
     private bool[] greenGrid;
@@ -157,6 +175,32 @@ public class BatonTracker : MonoBehaviour
         {
             int outW = image.width / 4;
             int outH = image.height / 4;
+            DownscaledWidth = outW;
+            DownscaledHeight = outH;
+
+            // Compute image→screen mapping accounting for aspect ratio mismatch.
+            // The AR camera fills the screen (ScaleToFill) so one axis fits exactly
+            // and the other is cropped symmetrically.
+            float imgAspect = (float)image.width / image.height;
+            float screenAspect = (float)Screen.width / Screen.height;
+
+            if (screenAspect > imgAspect)
+            {
+                // Screen is wider than image → image width fits, height is cropped
+                imgToScreenScaleX = (float)Screen.width / outW;
+                imgToScreenScaleY = imgToScreenScaleX;
+                imgToScreenOffsetX = 0f;
+                imgToScreenOffsetY = (Screen.height - outH * imgToScreenScaleY) * 0.5f;
+            }
+            else
+            {
+                // Screen is taller than image → image height fits, width is cropped
+                imgToScreenScaleY = (float)Screen.height / outH;
+                imgToScreenScaleX = imgToScreenScaleY;
+                imgToScreenOffsetX = (Screen.width - outW * imgToScreenScaleX) * 0.5f;
+                imgToScreenOffsetY = 0f;
+            }
+
             int bufferSize = image.GetConvertedDataSize(
                 new Vector2Int(outW, outH), TextureFormat.RGBA32);
 
@@ -174,10 +218,7 @@ public class BatonTracker : MonoBehaviour
 
                 if (DetectBatonTip(buffer, outW, outH, out Vector2 tipScreen))
                 {
-                    float scaleX = (float)Screen.width / outW;
-                    float scaleY = (float)Screen.height / outH;
-                    tipScreen.x *= scaleX;
-                    tipScreen.y *= scaleY;
+                    tipScreen = ImageToScreen(tipScreen);
 
                     smoothedScreenPos = tipScreen;
                     TipScreenPosition = Vector2.SmoothDamp(
@@ -299,10 +340,19 @@ public class BatonTracker : MonoBehaviour
         }
 
         if (!bestBlob.HasValue)
+        {
+            BlobPixelCount = 0;
             return false;
+        }
 
         var best = bestBlob.Value;
         Vector2 centroid = best.Centroid;
+        BlobPixelCount = best.pixels.Count;
+        BlobCentroidScreen = ImageToScreen(centroid);
+
+        Vector2 rectMin = ImageToScreen(new Vector2(best.minX, best.minY));
+        Vector2 rectMax = ImageToScreen(new Vector2(best.maxX + 1, best.maxY + 1));
+        BlobScreenRect = new Rect(rectMin.x, rectMin.y, rectMax.x - rectMin.x, rectMax.y - rectMin.y);
 
         // 4. Find tip: extremity furthest from centroid
         Vector2 tip = centroid;
@@ -318,6 +368,22 @@ public class BatonTracker : MonoBehaviour
             }
         }
 
+        // 5. Find base: furthest from tip (opposite end of baton)
+        Vector2 baseEnd = centroid;
+        float maxDistFromTipSq = 0f;
+        foreach (var p in best.pixels)
+        {
+            float dSq = (new Vector2(p.x, p.y) - tip).sqrMagnitude;
+            if (dSq > maxDistFromTipSq)
+            {
+                maxDistFromTipSq = dSq;
+                baseEnd = new Vector2(p.x, p.y);
+            }
+        }
+
+        BlobTipScreen = ImageToScreen(tip);
+        BlobBaseScreen = ImageToScreen(baseEnd);
+
         tipScreen = tip;
         TrackingConfidence = Mathf.Clamp01((float)best.pixels.Count / 500f);
         return true;
@@ -332,49 +398,61 @@ public class BatonTracker : MonoBehaviour
         queue.Enqueue(new Vector2Int(x, y));
     }
 
+    private Vector2 ImageToScreen(Vector2 imgPos)
+    {
+        return new Vector2(
+            imgPos.x * imgToScreenScaleX + imgToScreenOffsetX,
+            imgPos.y * imgToScreenScaleY + imgToScreenOffsetY);
+    }
+
     private Vector3 ScreenToWorld(Vector2 screenPos)
     {
         Ray ray = arCamera.ScreenPointToRay(screenPos);
         return ray.origin + ray.direction * estimatedDepth;
     }
 
+    private Texture2D debugTex;
+
     private void OnGUI()
     {
         if (!showCalibrator) return;
 
-        float scale = 2f;
+        float dpi = Screen.dpi > 0 ? Screen.dpi : 160f;
+        float scale = Mathf.Max(4f, dpi / 18f);
         GUI.matrix = Matrix4x4.TRS(Vector2.zero, Quaternion.identity, Vector2.one * scale);
 
-        float panelW = 280;
-        float panelH = 320;
-        GUILayout.BeginArea(new Rect(10, 10, panelW, panelH), GUI.skin.box);
-        GUILayout.Label("HSV Calibrator", GUI.skin.label);
-        GUILayout.Space(4);
+        float sw = Screen.width / scale;
+        float sh = Screen.height / scale;
+        float panelW = Mathf.Min(sw - 8, 260);
+        float panelH = Mathf.Min(sh - 8, 300);
+        GUILayout.BeginArea(new Rect(4, 4, panelW, panelH), GUI.skin.box);
+        GUILayout.Label("HSV Calibrator");
+        GUILayout.Space(2);
 
-        GUILayout.Label($"Green pixels: {lastGreenPixelCount}  Blobs: {lastBlobCount}");
-        GUILayout.Label(IsTracking ? "Tracking" : "Not tracking", IsTracking ? GUI.skin.label : GUI.skin.box);
-        GUILayout.Space(8);
+        GUILayout.Label($"Green px: {lastGreenPixelCount}  Blobs: {lastBlobCount}");
+        GUILayout.Label(IsTracking ? "TRACKING" : "NOT TRACKING");
+        GUILayout.Space(4);
 
         GUILayout.Label($"Hue: {hueMin:F2} - {hueMax:F2}");
         GUILayout.BeginHorizontal();
-        hueMin = GUILayout.HorizontalSlider(hueMin, 0f, 1f, GUILayout.Width(100));
-        hueMax = GUILayout.HorizontalSlider(hueMax, 0f, 1f, GUILayout.Width(100));
+        hueMin = GUILayout.HorizontalSlider(hueMin, 0f, 1f, GUILayout.Width(panelW * 0.4f));
+        hueMax = GUILayout.HorizontalSlider(hueMax, 0f, 1f, GUILayout.Width(panelW * 0.4f));
         GUILayout.EndHorizontal();
 
-        GUILayout.Label($"Saturation min: {saturationMin:F2}");
+        GUILayout.Label($"Sat min: {saturationMin:F2}");
         saturationMin = GUILayout.HorizontalSlider(saturationMin, 0f, 1f);
 
-        GUILayout.Label($"Value min: {valueMin:F2}");
+        GUILayout.Label($"Val min: {valueMin:F2}");
         valueMin = GUILayout.HorizontalSlider(valueMin, 0f, 1f);
 
-        GUILayout.Label($"Green dominance: {greenDominanceMin:F2}");
+        GUILayout.Label($"Green dom: {greenDominanceMin:F2}");
         greenDominanceMin = GUILayout.HorizontalSlider(greenDominanceMin, 0f, 0.5f);
 
-        GUILayout.Label($"Min pixels: {minGreenPixels}");
+        GUILayout.Label($"Min px: {minGreenPixels}");
         minGreenPixels = (int)GUILayout.HorizontalSlider(minGreenPixels, 10, 200);
 
         GUILayout.Space(4);
-        if (GUILayout.Button("Reset to defaults"))
+        if (GUILayout.Button("Reset defaults", GUILayout.Height(30)))
         {
             hueMin = 0.22f;
             hueMax = 0.45f;
@@ -385,6 +463,43 @@ public class BatonTracker : MonoBehaviour
         }
 
         GUILayout.EndArea();
+
+        // Reset matrix for debug overlay drawn in actual screen coords
+        GUI.matrix = Matrix4x4.identity;
+
+        if (IsTracking)
+        {
+            if (debugTex == null)
+            {
+                debugTex = new Texture2D(1, 1);
+                debugTex.SetPixel(0, 0, Color.white);
+                debugTex.Apply();
+            }
+
+            // Draw crosshairs at tip and base in GUI coords (y flipped from screen coords)
+            float guiTipY = Screen.height - BlobTipScreen.y;
+            float guiBaseY = Screen.height - BlobBaseScreen.y;
+
+            // Tip = magenta cross
+            GUI.color = Color.magenta;
+            GUI.DrawTexture(new Rect(BlobTipScreen.x - 15, guiTipY - 2, 30, 4), debugTex);
+            GUI.DrawTexture(new Rect(BlobTipScreen.x - 2, guiTipY - 15, 4, 30), debugTex);
+
+            // Base = cyan cross
+            GUI.color = Color.cyan;
+            GUI.DrawTexture(new Rect(BlobBaseScreen.x - 15, guiBaseY - 2, 30, 4), debugTex);
+            GUI.DrawTexture(new Rect(BlobBaseScreen.x - 2, guiBaseY - 15, 4, 30), debugTex);
+
+            // Bounding rect
+            GUI.color = new Color(1, 1, 0, 0.5f);
+            float guiRectY = Screen.height - BlobScreenRect.y - BlobScreenRect.height;
+            GUI.DrawTexture(new Rect(BlobScreenRect.x, guiRectY, BlobScreenRect.width, 2), debugTex);
+            GUI.DrawTexture(new Rect(BlobScreenRect.x, guiRectY + BlobScreenRect.height, BlobScreenRect.width, 2), debugTex);
+            GUI.DrawTexture(new Rect(BlobScreenRect.x, guiRectY, 2, BlobScreenRect.height), debugTex);
+            GUI.DrawTexture(new Rect(BlobScreenRect.x + BlobScreenRect.width, guiRectY, 2, BlobScreenRect.height), debugTex);
+
+            GUI.color = Color.white;
+        }
     }
 
 #if UNITY_EDITOR

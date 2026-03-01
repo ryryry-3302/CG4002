@@ -609,7 +609,7 @@ MonoBehaviour:
   radarDistance: 0
   radarHeight: 0.7
   radarScale: 70
-  cueLeadTime: 3
+  cueLeadTime: 2
   orchestraPlacement: {fileID: 1141421495}
   rhythmMap: {fileID: 164925909}
   use3DRadar: 1
@@ -919,6 +919,113 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 181674747}
   m_CullTransparentMesh: 1
+--- !u!1 &292930485
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 292930486}
+  - component: {fileID: 292930489}
+  - component: {fileID: 292930488}
+  - component: {fileID: 292930487}
+  m_Layer: 0
+  m_Name: OcclusionMask
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &292930486
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 292930485}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1939642339}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &292930487
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 292930485}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59d4ccd98804b3fa895f5c7cac392790, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  batonTracker: {fileID: 1939642338}
+  batonWidthPixels: 120
+  lengthExtension: 15
+  occlusionDepth: 0.65
+  tipTaper: 0.3
+  shaftColor: {r: 0.25, g: 0.13, b: 0.06, a: 1}
+  tipColor: {r: 0.85, g: 0.85, b: 0.9, a: 1}
+  gripColor: {r: 0.12, g: 0.12, b: 0.12, a: 1}
+  tipFraction: 0.15
+  gripFraction: 0.12
+  positionSmoothTime: 0.06
+--- !u!23 &292930488
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 292930485}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &292930489
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 292930485}
+  m_Mesh: {fileID: 0}
 --- !u!1 &429554884
 GameObject:
   m_ObjectHideFlags: 0
@@ -2806,6 +2913,81 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1939642336
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1939642339}
+  - component: {fileID: 1939642338}
+  - component: {fileID: 1939642337}
+  m_Layer: 0
+  m_Name: BatonTracker
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1939642337
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939642336}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9b9db23e08d4e4cadb68d08aa042286, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  batonTracker: {fileID: 0}
+  baseEmissionRate: 30
+  movementEmissionScale: 80
+  minEmissionWhenTracking: 8
+  fadeOutSpeed: 4
+--- !u!114 &1939642338
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939642336}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96b776b5c0b94b9cb001cef44a8401d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cameraManager: {fileID: 429554888}
+  hueMin: 0.1
+  hueMax: 0.45
+  saturationMin: 0.3
+  valueMin: 0.4
+  minGreenPixels: 70
+  greenDominanceMin: 0.1
+  showCalibrator: 0
+  estimatedDepth: 0.7
+  positionSmoothTime: 0.08
+  processEveryNFrames: 3
+  debugLogging: 0
+--- !u!4 &1939642339
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1939642336}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.1430459, y: 1.7966404, z: 0.8409395}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 292930486}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1989483125
 GameObject:
   m_ObjectHideFlags: 0
@@ -3020,3 +3202,4 @@ SceneRoots:
   - {fileID: 1775101449}
   - {fileID: 1141421496}
   - {fileID: 164925905}
+  - {fileID: 1939642339}
