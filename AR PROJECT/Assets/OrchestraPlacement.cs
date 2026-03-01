@@ -50,6 +50,10 @@ public class OrchestraPlacement : MonoBehaviour
 
     // Tutorial dialog steps (only in Tutorial mode)
     private int tutorialStep = 0;
+
+    // Auto-place: trigger once when planes detected
+    private bool autoPlaceTriggered;
+    private float autoPlaceDelay = 0.8f;
     
     // Gameplay HUD state
     private string lastJudgement = "";
@@ -144,6 +148,22 @@ public class OrchestraPlacement : MonoBehaviour
 
     void Update()
     {
+        // Auto-place when GameSettings.AutoPlace and planes detected
+        if (isPlacementMode && GameSettings.AutoPlace && !autoPlaceTriggered && planeManager != null && raycastManager != null)
+        {
+            int planeCount = 0;
+            foreach (var p in planeManager.trackables) planeCount++;
+            if (planeCount > 0 && sectionPlacedMember.Count == 0)
+            {
+                autoPlaceDelay -= Time.deltaTime;
+                if (autoPlaceDelay <= 0f)
+                {
+                    AutoPlaceAll();
+                    autoPlaceTriggered = true;
+                }
+            }
+        }
+
         // Tick judgement display timer
         if (judgementTimer > 0)
             judgementTimer -= Time.deltaTime;
@@ -171,6 +191,38 @@ public class OrchestraPlacement : MonoBehaviour
         }
         
         if (!isPlacementMode) return;
+
+        // Manual placement: handle tap to place when AutoPlace is off
+        if (!GameSettings.AutoPlace && raycastManager != null)
+        {
+            Vector2? tapPos = GetPlacementTapPosition();
+            if (tapPos.HasValue && !GetPlacementPanelScreenRect().Contains(tapPos.Value))
+                TryPlaceObject(tapPos.Value);
+        }
+    }
+
+    /// <summary>Screen rect of the placement menu panel - taps inside are blocked (menu consumes input).</summary>
+    private Rect GetPlacementPanelScreenRect()
+    {
+        const float scale = 3f;
+        const float x = 10f, y = 10f, w = 300f, h = 440f;
+        float px = x * scale, py = y * scale, pw = w * scale, ph = h * scale;
+        return new Rect(px, Screen.height - py - ph, pw, ph);
+    }
+
+    private Vector2? GetPlacementTapPosition()
+    {
+        if (Input.touchCount > 0)
+        {
+            Touch t = Input.GetTouch(0);
+            if (t.phase == TouchPhase.Began)
+                return t.position;
+        }
+#if UNITY_EDITOR
+        if (Input.GetMouseButtonDown(0))
+            return Input.mousePosition;
+#endif
+        return null;
     }
     
     void LateUpdate()
@@ -1049,6 +1101,31 @@ public class OrchestraPlacement : MonoBehaviour
             AutoPlaceAll();
         
         GUILayout.Space(8);
+
+        // Manual placement: section selector when Auto Place is off
+        if (!GameSettings.AutoPlace)
+        {
+            GUILayout.Label("Select musician to place:", labelStyle);
+            GUILayout.BeginHorizontal();
+            string[] sectionNames = { "Drum", "Flute", "Pipe", "Xylophone" };
+            for (int i = 0; i < 4; i++)
+            {
+                OrchestraSection sec = (OrchestraSection)i;
+                bool hasPlaced = sectionPlacedMember.ContainsKey(sec);
+                bool isSelected = selectedIndex == GetPrefabIndexForSection(sec);
+                string label = hasPlaced ? $"{sectionNames[i]} ✓" : sectionNames[i];
+                if (isSelected) label = "▶ " + label;
+                if (GUILayout.Button(label, buttonStyle, GUILayout.Height(28)))
+                {
+                    selectedIndex = GetPrefabIndexForSection(sec);
+                }
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Label("<i>Tap a plane (right side of screen) to place</i>", labelStyle);
+            GUILayout.Space(4);
+        }
+        
+        GUILayout.Space(8);
         
         // Lock button — highlight if all 4 placed
         GUI.enabled = placedCount > 0;
@@ -1066,7 +1143,7 @@ public class OrchestraPlacement : MonoBehaviour
         }
         
         GUILayout.Space(4);
-        GUILayout.Label("<i>Scan the room, then tap Auto Place</i>", labelStyle);
+        GUILayout.Label(GameSettings.AutoPlace ? "<i>Scan the room, then tap Auto Place</i>" : "<i>Select a musician above, then tap a plane to place</i>", labelStyle);
         
         GUILayout.EndScrollView();
         GUILayout.EndArea();
@@ -1207,7 +1284,15 @@ public class OrchestraPlacement : MonoBehaviour
             GUI.Label(new Rect((sw - 280f) / 2f, sh * 0.5f, 280f, 50f), wrongHint, labelStyle);
         }
         
-        // ── Bottom-left: edit button ──
+        // ── Bottom-left: MQTT indicator + edit button ──
+        bool mqttConnected = GameSettings.TestMode || (MQTTManager.Instance != null && MQTTManager.Instance.IsConnected);
+        string mqttText = GameSettings.TestMode ? "MQTT: Connected (Test)" : (mqttConnected ? "MQTT: Connected" : "MQTT: Disconnected");
+        Color mqttColor = mqttConnected ? new Color(0.2f, 1f, 0.3f) : new Color(1f, 0.3f, 0.2f);
+        int savedLabelSize2 = labelStyle.fontSize;
+        labelStyle.fontSize = 11;
+        DrawOutlinedLabel(new Rect(10, sh - 58, 160, 18), mqttText, labelStyle, mqttColor);
+        labelStyle.fontSize = savedLabelSize2;
+
         if (GUI.Button(new Rect(10, sh - 35, 70, 22), "✎ Edit", buttonStyle))
         {
             UnlockPlacements();

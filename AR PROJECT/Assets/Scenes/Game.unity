@@ -577,6 +577,10 @@ MonoBehaviour:
   audioSource: {fileID: 164925912}
   autoStartTestMap: 1
   comboStrokeWindow: 1
+  missSfxDrum: {fileID: 8300000, guid: eeacaaec06fed25289ef5d6e7f322028, type: 3}
+  missSfxFlute: {fileID: 8300000, guid: 13c122bffb95dead8888eecb216494b8, type: 3}
+  missSfxPipe: {fileID: 8300000, guid: 8bc82199e544cc34587895aae093856f, type: 3}
+  missSfxXylophone: {fileID: 8300000, guid: ed001606ccd81f0d297f198140b5929d, type: 3}
 --- !u!114 &164925909
 MonoBehaviour:
   m_ObjectHideFlags: 0

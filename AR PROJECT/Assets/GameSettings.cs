@@ -5,7 +5,17 @@ public enum GameMode
     Cheats
 }
 
+public enum Difficulty
+{
+    Easy,
+    Medium,
+    Hard
+}
+
 public static class GameSettings
 {
     public static GameMode CurrentMode = GameMode.Regular;
+    public static bool TestMode = true;
+    public static bool AutoPlace = true;
+    public static Difficulty DifficultyLevel = Difficulty.Medium;
 }

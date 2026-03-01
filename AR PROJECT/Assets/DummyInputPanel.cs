@@ -48,34 +48,31 @@ namespace OrchestraMaestro
         
         private void Update()
         {
-            // Toggle panel visibility with keyboard (editor testing only)
-            #if UNITY_EDITOR
-            if (Input.GetKeyDown(KeyCode.F1))
+            if (GameSettings.TestMode)
             {
-                showPanel = !showPanel;
+                showPanel = true;
             }
-            #endif
-            
-            // Toggle panel with touch in top-right corner
-            if (Input.touchCount > 0)
+            else
             {
-                Touch touch = Input.GetTouch(0);
-                if (touch.phase == TouchPhase.Began)
+                #if UNITY_EDITOR
+                if (Input.GetKeyDown(KeyCode.F1))
+                    showPanel = !showPanel;
+                #endif
+
+                if (Input.touchCount > 0)
                 {
-                    // Check if touch is in toggle button area (top-right)
-                    Vector2 touchPos = touch.position;
-                    // Convert to GUI coordinates (Y is inverted)
-                    float guiY = Screen.height - touchPos.y;
-                    
-                    if (touchPos.x > Screen.width - toggleButtonSize * panelScale - 20 &&
-                        guiY < toggleButtonSize * panelScale + 20)
+                    Touch touch = Input.GetTouch(0);
+                    if (touch.phase == TouchPhase.Began)
                     {
-                        showPanel = !showPanel;
+                        Vector2 touchPos = touch.position;
+                        float guiY = Screen.height - touchPos.y;
+                        if (touchPos.x > Screen.width - toggleButtonSize * panelScale - 20 &&
+                            guiY < toggleButtonSize * panelScale + 20)
+                            showPanel = !showPanel;
                     }
                 }
             }
-            
-            // Keyboard shortcuts for testing (editor only)
+
             if (Input.GetKeyDown(KeyCode.LeftArrow))
                 SimulateGesture("LEFT");
             if (Input.GetKeyDown(KeyCode.RightArrow))
@@ -95,11 +92,9 @@ namespace OrchestraMaestro
             // Apply scaling for mobile
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * panelScale);
             
-            // Panel always shown for dummy input testing
-            showPanel = true;
-            // ...existing code...
-            // No toggle or hide logic
-            
+            if (GameSettings.TestMode) showPanel = true;
+            if (!showPanel) return;
+
             // Recalculate rect for scaled coordinates
             float scaledPanelWidth = buttonWidth * 3 + padding * 4;
             float scaledPanelHeight = buttonHeight * 3 + padding * 5;

@@ -22,25 +22,23 @@ public class GameUIThemeManager : MonoBehaviour
         }
         if (rootCanvas == null) return;
 
-        // 2. Find Title and Text
+        // Find SettingsPanel - exclude it so SettingsPanelController controls its colors
+        Transform settingsPanel = rootCanvas.transform.Find("SettingsPanel");
+
+        // 2. Find Title and Text - only apply yellow to explicit titles; all other labels/buttons stay white
         TextMeshProUGUI[] allTexts = rootCanvas.GetComponentsInChildren<TextMeshProUGUI>(true);
         foreach (var text in allTexts)
         {
-            // Smart Detection: It's a title if name contains "Title" OR if the font is huge (>40)
-            if (text.gameObject.name.Contains("Title") || text.fontSize > 40)
-            {
-                text.color = titleColor;
-            }
-            else
-            {
-                text.color = buttonTextColor;
-            }
+            if (settingsPanel != null && text.transform.IsChildOf(settingsPanel)) continue; // Skip Settings panel
+            bool isTitle = text.gameObject.name.IndexOf("Title", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            text.color = isTitle ? titleColor : buttonTextColor;
         }
 
-        // 3. Find Buttons
+        // 3. Find Buttons - skip buttons inside SettingsPanel
         Button[] buttons = rootCanvas.GetComponentsInChildren<Button>(true);
         foreach (var btn in buttons)
         {
+            if (settingsPanel != null && btn.transform.IsChildOf(settingsPanel)) continue; // Skip Settings panel
             Image btnImage = btn.GetComponent<Image>();
             if (btnImage != null)
             {

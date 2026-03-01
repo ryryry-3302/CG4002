@@ -76,8 +76,16 @@ namespace OrchestraMaestro
 
         private void Start()
         {
-            // Auto-connect can be enabled here if desired
-            // Connect();
+            if (GameSettings.TestMode)
+            {
+                isConnected = true;
+                OnConnected?.Invoke();
+                PublishReady();
+            }
+            else
+            {
+                Connect();
+            }
         }
 
         private void Update()

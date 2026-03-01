@@ -26,6 +26,13 @@ namespace OrchestraMaestro
         [Header("Combo Validation")]
         [SerializeField] private float comboStrokeWindow = 1.0f; // Time window for combo stick patterns
 
+        [Header("Miss Sound Effects")]
+        [Tooltip("Assign your own out-of-tune clips per section. Leave empty to use procedural fallback.")]
+        [SerializeField] private AudioClip missSfxDrum;
+        [SerializeField] private AudioClip missSfxFlute;
+        [SerializeField] private AudioClip missSfxPipe;
+        [SerializeField] private AudioClip missSfxXylophone;
+
         // Game State
         public enum GameState { Setup, Playing, Paused, Results }
         private GameState currentState = GameState.Setup;
@@ -423,17 +430,67 @@ namespace OrchestraMaestro
         {
             if (currentState != GameState.Playing) return;
 
-            // A cue passed without being hit
             missCount++;
             combo = 0;
             OnScoreChanged?.Invoke(totalScore, combo);
 
             if (hudController != null)
-            {
                 hudController.ShowJudgement(JudgementType.Miss, 0);
-            }
+
+            PlayMissSfx(cue.targetSection ?? OrchestraSection.Drum);
 
             Debug.Log($"[RhythmGameController] Missed cue: {cue.gestureType} at {cue.timestamp}");
+        }
+
+        private static AudioClip[] proceduralMissCache;
+
+        private void PlayMissSfx(OrchestraSection section)
+        {
+            AudioClip clip = section switch
+            {
+                OrchestraSection.Drum => missSfxDrum,
+                OrchestraSection.Flute => missSfxFlute,
+                OrchestraSection.Pipe => missSfxPipe,
+                OrchestraSection.Xylophone => missSfxXylophone,
+                _ => missSfxDrum
+            };
+
+            if (clip == null)
+            {
+                if (proceduralMissCache == null)
+                {
+                    proceduralMissCache = new AudioClip[4];
+                    float[] baseFreq = { 140f, 350f, 260f, 280f };
+                    for (int i = 0; i < 4; i++)
+                        proceduralMissCache[i] = CreateMissSfxClip(baseFreq[i]);
+                }
+                clip = proceduralMissCache[(int)section];
+            }
+
+            if (clip != null && Camera.main != null)
+                AudioSource.PlayClipAtPoint(clip, Camera.main.transform.position, 0.6f);
+        }
+
+        private static AudioClip CreateMissSfxClip(float baseFreq)
+        {
+            int sampleRate = 44100;
+            float duration = 0.25f;
+            int samples = Mathf.RoundToInt(sampleRate * duration);
+            var data = new float[samples * 2];
+
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float freq = baseFreq * (1f + 0.08f * Mathf.Sin(t * 40f));
+                float wave = Mathf.Sin(2f * Mathf.PI * freq * t) * (1f - t / duration);
+                float noise = (UnityEngine.Random.value - 0.5f) * 0.15f;
+                float s = Mathf.Clamp(wave + noise, -1f, 1f);
+                data[i * 2] = data[i * 2 + 1] = s;
+            }
+
+            var clip = AudioClip.Create("MissSfx", samples, 2, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
 
         private void HandleCueAutoHit(ScoringResult result)
@@ -607,6 +664,7 @@ namespace OrchestraMaestro
                 case JudgementType.Miss:
                     missCount++;
                     combo = 0;
+                    PlayMissSfx(result.targetSection);
                     break;
             }
 

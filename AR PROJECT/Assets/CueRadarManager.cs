@@ -128,10 +128,16 @@ namespace OrchestraMaestro
         
         private void BindReferences()
         {
-            // Always re-find in case old references were destroyed by scene reload
             orchestraPlacement = FindObjectOfType<OrchestraPlacement>();
             rhythmMap = FindObjectOfType<RhythmMap>();
-            
+
+            cueLeadTime = GameSettings.DifficultyLevel switch
+            {
+                Difficulty.Easy => 4f,
+                Difficulty.Hard => 2f,
+                _ => 3f
+            };
+
             // Unsubscribe from any old (potentially destroyed) objects first, then subscribe fresh
             if (rhythmMap != null)
             {
