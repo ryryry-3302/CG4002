@@ -581,6 +581,11 @@ MonoBehaviour:
   missSfxFlute: {fileID: 8300000, guid: 13c122bffb95dead8888eecb216494b8, type: 3}
   missSfxPipe: {fileID: 8300000, guid: 8bc82199e544cc34587895aae093856f, type: 3}
   missSfxXylophone: {fileID: 8300000, guid: ed001606ccd81f0d297f198140b5929d, type: 3}
+  combo5xSfx: {fileID: 8300000, guid: 2eaa76044d5a0cd62aaad8419c94a449, type: 3}
+  combo10xSfx: {fileID: 8300000, guid: 6c4e93e8a0c8d735c87e0e61ef4228c8, type: 3}
+  combo20xSfx: {fileID: 8300000, guid: 09f918cbbe8be5820993214d79184fe3, type: 3}
+  ambienceSfx: {fileID: 8300000, guid: fe58bc31d175c5f3b8e509e4ef593178, type: 3}
+  endingSfx: {fileID: 8300000, guid: 09d79f3d17426dfbca945a84bef0bb5a, type: 3}
 --- !u!114 &164925909
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2339,8 +2344,8 @@ MonoBehaviour:
   missColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   highlightIntensity: 2
   feedbackDuration: 0.5
-  prefabScale: 0.5
-  selectorHaloPrefab: {fileID: 1836678590729647471, guid: ca9c1319baec7c12ea1b3d3cdd508795, type: 3}
+  prefabScale: 0.1
+  selectorHaloPrefab: {fileID: 3744133877081091469, guid: a2a060732547fe64581bb0cb3c2bdf1d, type: 3}
 --- !u!4 &1141421496
 Transform:
   m_ObjectHideFlags: 0

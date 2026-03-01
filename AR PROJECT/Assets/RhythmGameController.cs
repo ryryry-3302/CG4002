@@ -33,6 +33,18 @@ namespace OrchestraMaestro
         [SerializeField] private AudioClip missSfxPipe;
         [SerializeField] private AudioClip missSfxXylophone;
 
+        [Header("Combo Sound Effects")]
+        [Tooltip("Plays when combo hits 5x, 10x, or 20x. Assign clips in Inspector.")]
+        [SerializeField] private AudioClip combo5xSfx;   // mini applause
+        [SerializeField] private AudioClip combo10xSfx;  // loud applause
+        [SerializeField] private AudioClip combo20xSfx;  // applause and cheer
+
+        [Header("Ambience & Ending")]
+        [Tooltip("Plays once when the game/song starts.")]
+        [SerializeField] private AudioClip ambienceSfx;
+        [Tooltip("Plays once when entering the last 10 seconds of the song.")]
+        [SerializeField] private AudioClip endingSfx;
+
         // Game State
         public enum GameState { Setup, Playing, Paused, Results }
         private GameState currentState = GameState.Setup;
@@ -75,6 +87,7 @@ namespace OrchestraMaestro
         /// <summary>Current playback time in seconds. 0 if no map.</summary>
         public float CurrentSongTime => rhythmMap != null ? rhythmMap.CurrentSongTime : 0f;
         private float tutorialWrongGestureTime;
+        private bool endingSfxPlayed;
 
         #region Unity Lifecycle
 
@@ -151,6 +164,19 @@ namespace OrchestraMaestro
         {
             if (!string.IsNullOrEmpty(TutorialWrongGestureHint) && Time.time - tutorialWrongGestureTime > 3f)
                 TutorialWrongGestureHint = null;
+
+            // Ending SFX: play once when entering last 10 seconds
+            if (currentState == GameState.Playing && !endingSfxPlayed && endingSfx != null && audioSource != null && audioSource.clip != null)
+            {
+                float duration = audioSource.clip.length;
+                float currentTime = rhythmMap != null ? rhythmMap.CurrentSongTime : 0f;
+                if (currentTime >= duration - 10f)
+                {
+                    endingSfxPlayed = true;
+                    if (Camera.main != null)
+                        AudioSource.PlayClipAtPoint(endingSfx, Camera.main.transform.position, 0.6f);
+                }
+            }
         }
 
         private void OnDestroy()
@@ -240,6 +266,10 @@ namespace OrchestraMaestro
             
             rhythmMap.StartPlayback();
             SetGameState(GameState.Playing);
+            endingSfxPlayed = false;
+
+            if (ambienceSfx != null && Camera.main != null)
+                AudioSource.PlayClipAtPoint(ambienceSfx, Camera.main.transform.position, 0.5f);
 
             Debug.Log("[RhythmGameController] Game started!");
         }
@@ -471,6 +501,19 @@ namespace OrchestraMaestro
                 AudioSource.PlayClipAtPoint(clip, Camera.main.transform.position, 0.6f);
         }
 
+        private void PlayComboMilestoneSfx(int combo)
+        {
+            AudioClip clip = combo switch
+            {
+                5 => combo5xSfx,
+                10 => combo10xSfx,
+                20 => combo20xSfx,
+                _ => null
+            };
+            if (clip != null && Camera.main != null)
+                AudioSource.PlayClipAtPoint(clip, Camera.main.transform.position, 0.8f);
+        }
+
         private static AudioClip CreateMissSfxClip(float baseFreq)
         {
             int sampleRate = 44100;
@@ -670,6 +713,10 @@ namespace OrchestraMaestro
 
             // Update max combo
             if (combo > maxCombo) maxCombo = combo;
+
+            // Combo milestone SFX (5x, 10x, 20x)
+            if (result.judgement != JudgementType.Miss)
+                PlayComboMilestoneSfx(combo);
 
             // Calculate score with combo multiplier
             int comboMultiplier = Mathf.Min(1 + combo / 10, 4); // Max 4x multiplier

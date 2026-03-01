@@ -1022,7 +1022,7 @@ public class OrchestraPlacement : MonoBehaviour
     }
     
     [Header("Selector Halo")]
-    [Tooltip("Prefab for the glowing selector halo under the selected member")]
+    [Tooltip("Prefab for the glowing selector under the selected member (e.g. Magic circle).")]
     [SerializeField] private GameObject selectorHaloPrefab;
     
     private GameObject selectorHaloInstance;
@@ -1063,10 +1063,9 @@ public class OrchestraPlacement : MonoBehaviour
         }
         selectorHaloInstance.transform.position = haloPos + Vector3.down * 0.01f;
         selectorHaloInstance.transform.rotation = Quaternion.identity;
-        selectorHaloInstance.transform.localScale = new Vector3(
-            selectedMember.transform.localScale.x * 0.15f,
-            selectorHaloInstance.transform.localScale.y,
-            selectedMember.transform.localScale.z * 0.15f);
+        float baseScale = Mathf.Max(selectedMember.transform.localScale.x, selectedMember.transform.localScale.z);
+        float s = baseScale * 0.1f; 
+        selectorHaloInstance.transform.localScale = new Vector3(s, s, s);
     }
 
     private void DrawPlacementUI()
