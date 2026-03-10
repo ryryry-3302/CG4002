@@ -542,8 +542,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   brokerAddress: 172.20.10.2
   brokerPort: 8883
-  useTLS: 1
-  clientId: unity_visualizer
+  isEncrypted: 1
+  connectionDelay: 500
+  timeoutOnConnection: 30000
+  autoConnect: 1
+  mqttUserName: 
+  mqttPassword: 
+  mqttClientId: 
+  caCertAsset: {fileID: 4900000, guid: 576ea145d95aa6f3982b75ffaa9f0e80, type: 3}
+  clientPfxAsset: {fileID: 4900000, guid: cc2d277e7f5032b88b9d56353799065e, type: 3}
+  pfxPassword: cegb18
   leftGestureTopic: orchestra/left_gesture_event
   stickStrokeTopic: orchestra/stick_stroke
   systemStatusTopic: orchestra/system_status
@@ -551,6 +559,12 @@ MonoBehaviour:
   controlTopic: /control/visualizer
   stickBufferDuration: 2
   debugLogging: 1
+  enableTestPublish: 0
+  testPublishTopic: orchestra/test
+  testPublishInterval: 1
+  enableTestRead: 1
+  testReadTopic: orchestra/test
+  latestTestReadMessage: 
 --- !u!114 &164925908
 MonoBehaviour:
   m_ObjectHideFlags: 0
