@@ -129,8 +129,13 @@ namespace OrchestraMaestro
             {
                 MQTTManager.Instance.OnGestureReceived -= HandleGestureReceived;
                 MQTTManager.Instance.OnDownstroke -= HandleDownstroke;
+                MQTTManager.Instance.MqttDisconnected -= HandleMqttDisconnected;
+                MQTTManager.Instance.MqttConnected -= HandleMqttConnected;
+
                 MQTTManager.Instance.OnGestureReceived += HandleGestureReceived;
                 MQTTManager.Instance.OnDownstroke += HandleDownstroke;
+                MQTTManager.Instance.MqttDisconnected += HandleMqttDisconnected;
+                MQTTManager.Instance.MqttConnected += HandleMqttConnected;
             }
 
             // Subscribe to rhythm map events
@@ -187,6 +192,8 @@ namespace OrchestraMaestro
             {
                 MQTTManager.Instance.OnGestureReceived -= HandleGestureReceived;
                 MQTTManager.Instance.OnDownstroke -= HandleDownstroke;
+                MQTTManager.Instance.MqttDisconnected -= HandleMqttDisconnected;
+                MQTTManager.Instance.MqttConnected -= HandleMqttConnected;
             }
 
             if (orchestraPlacement != null)
@@ -802,6 +809,69 @@ namespace OrchestraMaestro
                 (int)result.targetSection, 
                 result.judgement
             );
+        }
+
+        #endregion
+
+        #region Reconnection Flow
+
+        private bool pausedForDisconnect = false;
+
+        private void HandleMqttDisconnected()
+        {
+            if (currentState == GameState.Playing)
+            {
+                PauseGame();
+                pausedForDisconnect = true;
+            }
+        }
+
+        private void HandleMqttConnected()
+        {
+            if (currentState == GameState.Paused && pausedForDisconnect)
+            {
+                ResumeGame();
+                pausedForDisconnect = false;
+            }
+        }
+
+        private void OnGUI()
+        {
+            if (currentState == GameState.Paused && pausedForDisconnect)
+            {
+                float width = 600;
+                float height = 150;
+                float x = (Screen.width - width) / 2f;
+                float y = (Screen.height - height) / 2f;
+
+                // Make a dark background box
+                GUI.color = new Color(1, 1, 1, 0.9f);
+                GUI.Box(new Rect(0, 0, Screen.width, Screen.height), "");
+                GUI.Box(new Rect(x - 20, y - 60, width + 40, height + 100), "");
+                
+                GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
+                labelStyle.fontSize = 40;
+                labelStyle.alignment = TextAnchor.MiddleCenter;
+                labelStyle.normal.textColor = Color.red;
+
+                GUI.Label(new Rect(x, y - 40, width, 60), "CONNECTION LOST", labelStyle);
+
+                // Show re-connecting status if it's already trying
+                if (MQTTManager.Instance != null && !MQTTManager.Instance.IsConnected)
+                {
+                    GUIStyle btnStyle = new GUIStyle(GUI.skin.button);
+                    btnStyle.fontSize = 36;
+                    
+                    if (GUI.Button(new Rect(x, y + 40, width, height), "RECONNECT MANUALLY", btnStyle))
+                    {
+                        MQTTManager.Instance.Connect();
+                    }
+                }
+                else
+                {
+                    GUI.Label(new Rect(x, y + 40, width, height), "Reconnected! Resuming...", labelStyle);
+                }
+            }
         }
 
         #endregion
