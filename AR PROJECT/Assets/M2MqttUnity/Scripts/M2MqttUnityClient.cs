@@ -281,79 +281,86 @@ namespace M2MqttUnity
             // leave some time to Unity to refresh the UI
             yield return new WaitForEndOfFrame();
 
-            // create client instance 
-            if (client == null)
+            OnConnecting();
+
+            byte[] caBytes = null;
+            byte[] clientBytes = null;
+            string pwd = pfxPassword;
+
+            if (isEncrypted)
+            {
+                if (caCertAsset != null)
+                    caBytes = caCertAsset.bytes;
+                else
+                    Debug.LogWarning("[M2Mqtt] Ca Cert Asset is not assigned in the Inspector.");
+
+                if (clientPfxAsset != null)
+                    clientBytes = clientPfxAsset.bytes;
+                else
+                    Debug.LogWarning("[M2Mqtt] Client Pfx Asset is not assigned in the Inspector.");
+            }
+
+            string client_Id = string.IsNullOrEmpty(mqttClientId) ? Guid.NewGuid().ToString() : mqttClientId;
+
+            bool isDone = false;
+            Exception threadEx = null;
+
+            System.Threading.ThreadPool.QueueUserWorkItem((state) =>
             {
                 try
                 {
-#if (!UNITY_EDITOR && UNITY_WSA_10_0 && !ENABLE_IL2CPP)
-                    client = new MqttClient(brokerAddress,brokerPort,isEncrypted, isEncrypted ? MqttSslProtocols.SSLv3 : MqttSslProtocols.None);
-#else
-                    X509Certificate caCert = null;
-                    X509Certificate clientCert = null;
-
-                    if (isEncrypted)
+                    if (client == null)
                     {
-                        if (caCertAsset != null)
+#if (!UNITY_EDITOR && UNITY_WSA_10_0 && !ENABLE_IL2CPP)
+                        client = new MqttClient(brokerAddress, brokerPort, isEncrypted, isEncrypted ? MqttSslProtocols.SSLv3 : MqttSslProtocols.None);
+#else
+                        X509Certificate caCert = null;
+                        X509Certificate clientCert = null;
+
+                        if (isEncrypted)
                         {
-                            caCert = new X509Certificate2(caCertAsset.bytes);
-                        }
-                        else
-                        {
-                            Debug.LogWarning("[M2Mqtt] Ca Cert Asset is not assigned in the Inspector.");
+                            if (caBytes != null)
+                                caCert = new X509Certificate2(caBytes);
+
+                            if (clientBytes != null)
+                                clientCert = new X509Certificate2(clientBytes, pwd,
+                                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
                         }
 
-                        if (clientPfxAsset != null)
-                        {
-                            clientCert = new X509Certificate2(clientPfxAsset.bytes, pfxPassword,
-                                X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-                        }
-                        else
-                        {
-                            Debug.LogWarning("[M2Mqtt] Client Pfx Asset is not assigned in the Inspector.");
-                        }
+                        client = new MqttClient(brokerAddress, brokerPort, isEncrypted, caCert, clientCert, isEncrypted ? MqttSslProtocols.TLSv1_2 : MqttSslProtocols.None);
+#endif
                     }
 
-                    client = new MqttClient(brokerAddress, brokerPort, isEncrypted, caCert, clientCert, isEncrypted ? MqttSslProtocols.TLSv1_2 : MqttSslProtocols.None);
-#endif
+                    if (!client.IsConnected)
+                    {
+                        client.Settings.TimeoutOnConnection = timeoutOnConnection;
+                        client.Connect(client_Id, mqttUserName, mqttPassword);
+                    }
                 }
                 catch (Exception e)
                 {
-                    client = null;
-                    Debug.LogError("[M2Mqtt] MqttClient init FAILED");
-                    LogFullException(e);
-                    OnConnectionFailed(e.Message);
-                    yield break;
+                    threadEx = e;
                 }
-            }
-            else if (client.IsConnected)
-            {
-                yield break;
-            }
-            OnConnecting();
+                finally
+                {
+                    isDone = true;
+                }
+            });
 
-            // leave some time to Unity to refresh the UI
-            yield return new WaitForEndOfFrame();
-            yield return new WaitForEndOfFrame();
+            yield return new WaitUntil(() => isDone);
 
-            client.Settings.TimeoutOnConnection = timeoutOnConnection;
-            string clientId = string.IsNullOrEmpty(mqttClientId) ? Guid.NewGuid().ToString() : mqttClientId;
-            try
-            {
-                client.Connect(clientId, mqttUserName, mqttPassword);
-            }
-            catch (Exception e)
+            if (threadEx != null)
             {
                 client = null;
-                Debug.LogError("[M2Mqtt] broker.Connect() FAILED");
-                LogFullException(e);
-                OnConnectionFailed(e.Message);
+                Debug.LogError("[M2Mqtt] broker.Connect() or Init FAILED");
+                LogFullException(threadEx);
+                OnConnectionFailed(threadEx.Message);
                 yield break;
             }
-            if (client.IsConnected)
+
+            if (client != null && client.IsConnected)
             {
                 client.ConnectionClosed += OnMqttConnectionClosed;
-                // register to message received 
                 client.MqttMsgPublishReceived += OnMqttMessageReceived;
                 mqttClientConnected = true;
                 OnConnected();

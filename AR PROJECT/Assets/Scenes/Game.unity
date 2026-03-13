@@ -552,17 +552,21 @@ MonoBehaviour:
   caCertAsset: {fileID: 4900000, guid: 576ea145d95aa6f3982b75ffaa9f0e80, type: 3}
   clientPfxAsset: {fileID: 4900000, guid: cc2d277e7f5032b88b9d56353799065e, type: 3}
   pfxPassword: cegb18
+  useLocalTesting: 1
+  localBrokerIP: 10.238.212.169
+  localBrokerPort: 1883
   leftGestureTopic: orchestra/left_gesture_event
   stickStrokeTopic: orchestra/stick_stroke
   systemStatusTopic: orchestra/system_status
   appStateTopic: orchestra/app_state
   controlTopic: /control/visualizer
+  rightCommandTopic: ar/right/cmd
   stickBufferDuration: 2
   debugLogging: 1
   enableTestPublish: 0
   testPublishTopic: orchestra/test
   testPublishInterval: 1
-  enableTestRead: 1
+  enableTestRead: 0
   testReadTopic: orchestra/test
   latestTestReadMessage: 
 --- !u!114 &164925908

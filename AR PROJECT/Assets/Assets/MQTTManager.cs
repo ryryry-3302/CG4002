@@ -23,12 +23,23 @@ namespace OrchestraMaestro
     /// </summary>
     public class MQTTManager : M2MqttUnity.M2MqttUnityClient
     {
+        [Header("Local Testing")]
+        [SerializeField] private bool useLocalTesting = false;
+        [SerializeField] private string localBrokerIP = "192.168.1.100";
+        [SerializeField] private int localBrokerPort = 1883;
+
         [Header("Topics")]
         [SerializeField] private string leftGestureTopic = "orchestra/left_gesture_event";
         [SerializeField] private string stickStrokeTopic = "orchestra/stick_stroke";
         [SerializeField] private string systemStatusTopic = "orchestra/system_status";
         [SerializeField] private string appStateTopic = "orchestra/app_state";
         [SerializeField] private string controlTopic = "/control/visualizer";
+        [SerializeField] private string rightCommandTopic = "ar/right/cmd";
+
+        [Header("Auto Reconnect")]
+        [SerializeField] private bool autoReconnect = true;
+        [SerializeField] private float reconnectInterval = 5f;
+        private Coroutine reconnectCoroutine;
 
         [Header("Stick Buffer")]
         [SerializeField] private float stickBufferDuration = 2.0f;
@@ -87,6 +98,14 @@ namespace OrchestraMaestro
             }
             else
             {
+                if (useLocalTesting)
+                {
+                    brokerAddress = localBrokerIP;
+                    brokerPort = localBrokerPort;
+                    isEncrypted = false;
+                    Debug.Log($"[MQTTManager] Local testing enabled. Overriding broker to {brokerAddress}:{brokerPort}");
+                }
+
                 // Set autoConnect = false so we control when to connect
                 autoConnect = false;
                 base.Start();
@@ -159,6 +178,11 @@ namespace OrchestraMaestro
         {
             base.OnConnected();
             Log($"Connected to MQTT broker at {brokerAddress}:{brokerPort}");
+            if (reconnectCoroutine != null)
+            {
+                StopCoroutine(reconnectCoroutine);
+                reconnectCoroutine = null;
+            }
             MqttConnected?.Invoke();
             PublishReady();
             if (enableTestPublish)
@@ -171,6 +195,7 @@ namespace OrchestraMaestro
             Log("Disconnected from MQTT broker");
             StopTestPublish();
             MqttDisconnected?.Invoke();
+            HandleReconnection();
         }
 
         protected override void OnConnectionFailed(string errorMessage)
@@ -178,6 +203,24 @@ namespace OrchestraMaestro
             base.OnConnectionFailed(errorMessage);
             Debug.LogError($"[MQTTManager] Connection failed: {errorMessage}");
             OnConnectionError?.Invoke(errorMessage);
+            HandleReconnection();
+        }
+
+        private void HandleReconnection()
+        {
+            if (autoReconnect && reconnectCoroutine == null && !GameSettings.TestMode)
+            {
+                reconnectCoroutine = StartCoroutine(ReconnectRoutine());
+            }
+        }
+
+        private IEnumerator ReconnectRoutine()
+        {
+            Log($"Attempting to reconnect in {reconnectInterval} seconds...");
+            yield return new WaitForSeconds(reconnectInterval);
+            reconnectCoroutine = null;
+            Log("Reconnecting...");
+            Connect();
         }
 
         protected override void DecodeMessage(string topic, byte[] payload)
@@ -225,6 +268,23 @@ namespace OrchestraMaestro
             Publish(appStateTopic, payload);
         }
 
+        public void PublishRightCommand(string command)
+        {
+            if (string.IsNullOrWhiteSpace(rightCommandTopic))
+            {
+                LogWarning("Cannot publish right command: rightCommandTopic is empty");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                LogWarning("Cannot publish right command: command is empty");
+                return;
+            }
+
+            Publish(rightCommandTopic, command.Trim().ToUpperInvariant());
+        }
+
         private void Publish(string topic, string payload)
         {
             if (!IsConnected)
@@ -254,22 +314,54 @@ namespace OrchestraMaestro
             }
         }
 
-        private void HandleStickMessage(string json)
+        private void HandleStickMessage(string message)
         {
-            try
+            string normalized = (message ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized))
             {
-                RightStickEvent evt = JsonUtility.FromJson<RightStickEvent>(json);
-                if (evt.type == "DOWNSTROKE")
+                LogWarning("Received empty stick message");
+                return;
+            }
+
+            string strokeType = null;
+
+            if (normalized.StartsWith("{"))
+            {
+                try
                 {
-                    float localTime = Time.time;
-                    downstrokeBuffer.Enqueue(localTime);
-                    Log($"Downstroke at {localTime:F3}");
-                    OnDownstroke?.Invoke(localTime);
+                    RightStickEvent evt = JsonUtility.FromJson<RightStickEvent>(normalized);
+                    strokeType = evt.type;
+                }
+                catch (Exception e)
+                {
+                    LogWarning($"Failed to parse stick JSON message: {e.Message}");
                 }
             }
-            catch (Exception e)
+
+            if (string.IsNullOrWhiteSpace(strokeType))
             {
-                LogWarning($"Failed to parse stick message: {e.Message}");
+                if (string.Equals(normalized, "DOWN", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "DOWNSTROKE", StringComparison.OrdinalIgnoreCase))
+                {
+                    strokeType = "DOWNSTROKE";
+                }
+                else if (string.Equals(normalized, "UP", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalized, "UPSTROKE", StringComparison.OrdinalIgnoreCase))
+                {
+                    strokeType = "UPSTROKE";
+                }
+            }
+
+            if (string.Equals(strokeType, "DOWNSTROKE", StringComparison.OrdinalIgnoreCase))
+            {
+                float localTime = Time.time;
+                downstrokeBuffer.Enqueue(localTime);
+                Log($"Downstroke at {localTime:F3}");
+                OnDownstroke?.Invoke(localTime);
+            }
+            else if (debugLogging)
+            {
+                Log($"Ignored stick message: {normalized}");
             }
         }
 

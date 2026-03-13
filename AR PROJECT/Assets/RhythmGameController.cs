@@ -729,6 +729,8 @@ namespace OrchestraMaestro
             OnGestureJudged?.Invoke(result);
             OnScoreChanged?.Invoke(totalScore, combo);
 
+            MQTTManager.Instance?.PublishRightCommand(result.judgement.ToString());
+
             // Apply audio effects
             ApplyGestureAudioEffect(gesture, result);
 

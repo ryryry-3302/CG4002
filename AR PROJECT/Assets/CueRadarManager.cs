@@ -123,7 +123,7 @@ namespace OrchestraMaestro
             // Scene reloaded — old references are dead, re-acquire everything
             ResetForNewGame();
             BindReferences();
-            Debug.Log($"[CueRadarManager] Scene '{scene.name}' loaded — re-bound references");
+            // Debug.Log($"[CueRadarManager] Scene '{scene.name}' loaded — re-bound references");
         }
         
         private void BindReferences()
@@ -159,11 +159,11 @@ namespace OrchestraMaestro
                 RhythmGameController.Instance.OnGameStateChanged -= HandleGameStateChanged;
                 RhythmGameController.Instance.OnGestureJudged += HandleGestureJudged;
                 RhythmGameController.Instance.OnGameStateChanged += HandleGameStateChanged;
-                Debug.Log("[CueRadarManager] Subscribed to RhythmGameController events");
+                // Debug.Log("[CueRadarManager] Subscribed to RhythmGameController events");
             }
             else
             {
-                Debug.LogWarning("[CueRadarManager] RhythmGameController.Instance is null!");
+                // Debug.LogWarning("[CueRadarManager] RhythmGameController.Instance is null!");
             }
         }
 
@@ -172,7 +172,7 @@ namespace OrchestraMaestro
             // Check if we should spawn radars (game started playing)
             if (!radarsSpawned && rhythmMap != null && rhythmMap.IsPlaying)
             {
-                Debug.Log("[CueRadarManager] Game is playing - spawning radars now");
+                // Debug.Log("[CueRadarManager] Game is playing - spawning radars now");
                 SpawnRadars();
                 radarsSpawned = true;
             }
@@ -236,17 +236,17 @@ namespace OrchestraMaestro
                 // Use 3D radars if enabled (more reliable in AR)
                 if (use3DRadar)
                 {
-                    Debug.Log("[CueRadarManager] Creating 3D radars (no prefab, use3DRadar=true)");
+                    // Debug.Log("[CueRadarManager] Creating 3D radars (no prefab, use3DRadar=true)");
                     Create3DRadars();
                     return;
                 }
                 
-                Debug.LogWarning("[CueRadarManager] No radar prefab assigned. Creating placeholder radars.");
+                // Debug.LogWarning("[CueRadarManager] No radar prefab assigned. Creating placeholder radars.");
                 CreatePlaceholderRadars();
                 return;
             }
             
-            Debug.Log("[CueRadarManager] Spawning radars from prefab...");
+            // Debug.Log("[CueRadarManager] Spawning radars from prefab...");
             
             for (int i = 0; i < 4; i++)
             {
@@ -262,11 +262,11 @@ namespace OrchestraMaestro
                 {
                     canvas.worldCamera = Camera.main;
                     canvas.sortingOrder = 100; // Render on top
-                    Debug.Log($"[CueRadarManager] Set canvas camera for {section}");
+                    // Debug.Log($"[CueRadarManager] Set canvas camera for {section}");
                 }
                 else
                 {
-                    Debug.LogError($"[CueRadarManager] No Canvas found in prefab!");
+                    // Debug.LogError($"[CueRadarManager] No Canvas found in prefab!");
                 }
                 
                 // Face camera
@@ -280,7 +280,7 @@ namespace OrchestraMaestro
                 
                 if (radars[i] == null)
                 {
-                    Debug.LogError($"[CueRadarManager] Prefab missing CueRadarController component!");
+                    // Debug.LogError($"[CueRadarManager] Prefab missing CueRadarController component!");
                     radars[i] = radarObj.AddComponent<CueRadarController>();
                 }
                 
@@ -288,10 +288,10 @@ namespace OrchestraMaestro
                 radarObj.SetActive(true);
                 // radars[i].Hide(); // Commented out for debugging
                 
-                Debug.Log($"[CueRadarManager] Spawned radar for {section} at {position}");
+                // Debug.Log($"[CueRadarManager] Spawned radar for {section} at {position}");
             }
             
-            Debug.Log("[CueRadarManager] Spawned 4 cue radars from prefab");
+            // Debug.Log("[CueRadarManager] Spawned 4 cue radars from prefab");
         }
 
         private void Create3DRadars()
@@ -301,7 +301,7 @@ namespace OrchestraMaestro
             {
                 OrchestraSection section = (OrchestraSection)i;
                 Vector3? pos = orchestraPlacement != null ? orchestraPlacement.GetSectionPosition(section) : null;
-                Debug.Log($"[CueRadarManager] Section {section} position: {(pos.HasValue ? pos.Value.ToString() : "NONE (no instrument placed)")}");
+                // Debug.Log($"[CueRadarManager] Section {section} position: {(pos.HasValue ? pos.Value.ToString() : "NONE (no instrument placed)")}");
             }
             
             int created = 0;
@@ -320,12 +320,12 @@ namespace OrchestraMaestro
                     (sectionPos.HasValue ? $" (instrument at {sectionPos.Value})" : " (fallback - no instrument)"));
             }
             
-            Debug.Log("[CueRadarManager] Created 4/4 radars.");
+            // Debug.Log("[CueRadarManager] Created 4/4 radars.");
         }
 
         private void CreatePlaceholderRadars()
         {
-            Debug.Log("[CueRadarManager] Creating placeholder radars with visible UI");
+            // Debug.Log("[CueRadarManager] Creating placeholder radars with visible UI");
             
             // Calculate canvas size based on radarScale (base size 1 unit = 1 meter)
             float canvasSize = 1f; // 1 meter base
@@ -391,7 +391,7 @@ namespace OrchestraMaestro
                 // Start hidden
                 radarObj.SetActive(false);
                 
-                Debug.Log($"[CueRadarManager] Created radar for {section} at {position}, scale={radarScale}");
+                // Debug.Log($"[CueRadarManager] Created radar for {section} at {position}, scale={radarScale}");
             }
         }
 
@@ -406,12 +406,12 @@ namespace OrchestraMaestro
                     // Position radar in front of and above the section
                     Vector3 toCamera = (Camera.main.transform.position - sectionPos.Value).normalized;
                     Vector3 finalPos = sectionPos.Value + toCamera * radarDistance + Vector3.up * (radarHeight * 0.75f);
-                    Debug.Log($"[CueRadarManager] GetRadarPosition({section}): sectionPos={sectionPos.Value}, finalPos={finalPos}");
+                    // Debug.Log($"[CueRadarManager] GetRadarPosition({section}): sectionPos={sectionPos.Value}, finalPos={finalPos}");
                     return finalPos;
                 }
                 else
                 {
-                    Debug.LogWarning($"[CueRadarManager] No position found for section {section}");
+                    // Debug.LogWarning($"[CueRadarManager] No position found for section {section}");
                 }
             }
             
@@ -419,7 +419,7 @@ namespace OrchestraMaestro
             float spacing = 1.0f;
             float startX = -1.5f * spacing;
             Vector3 fallbackPos = new Vector3(startX + (int)section * spacing, radarHeight, -2f);
-            Debug.Log($"[CueRadarManager] GetRadarPosition({section}): using fallback={fallbackPos}");
+            // Debug.Log($"[CueRadarManager] GetRadarPosition({section}): using fallback={fallbackPos}");
             return fallbackPos;
         }
 
@@ -449,7 +449,7 @@ namespace OrchestraMaestro
                 cueQueues[sectionIndex].Enqueue(cue);
                 queuedCueHashes.Add(hash);
                 
-                Debug.Log($"[CueRadarManager] Queued cue: {cue.gestureType} for {cue.targetSection}");
+                // Debug.Log($"[CueRadarManager] Queued cue: {cue.gestureType} for {cue.targetSection}");
                 
                 // If no active cue for this section, show it
                 if (!activeCues[sectionIndex].HasValue)
@@ -473,11 +473,11 @@ namespace OrchestraMaestro
             // Calculate time until hit
             float timeUntilHit = nextCue.timestamp - (float)rhythmMap.CurrentSongTime;
             
-            Debug.Log($"[CueRadarManager] ShowNextCue: section={sectionIndex}, gesture={nextCue.gestureType}, timeUntilHit={timeUntilHit}");
+            // Debug.Log($"[CueRadarManager] ShowNextCue: section={sectionIndex}, gesture={nextCue.gestureType}, timeUntilHit={timeUntilHit}");
             
             if (radars[sectionIndex] != null)
             {
-                Debug.Log($"[CueRadarManager] Calling ShowCue on radar {sectionIndex}");
+                // Debug.Log($"[CueRadarManager] Calling ShowCue on radar {sectionIndex}");
                 radars[sectionIndex].ShowCue(nextCue.gestureType, timeUntilHit);
                 
                 // Update radar position (in case instruments moved)
@@ -485,7 +485,7 @@ namespace OrchestraMaestro
             }
             else if (radars3D[sectionIndex] != null)
             {
-                Debug.Log($"[CueRadarManager] Calling ShowCue on 3D radar {sectionIndex}");
+                // Debug.Log($"[CueRadarManager] Calling ShowCue on 3D radar {sectionIndex}");
                 radars3D[sectionIndex].ShowCue(nextCue.gestureType, timeUntilHit);
                 
                 // Update radar position
@@ -493,7 +493,7 @@ namespace OrchestraMaestro
             }
             else
             {
-                Debug.LogError($"[CueRadarManager] Radar {sectionIndex} is null!");
+                // Debug.LogError($"[CueRadarManager] Radar {sectionIndex} is null!");
             }
         }
 
@@ -641,7 +641,7 @@ namespace OrchestraMaestro
             queuedCueHashes.Clear();
             radarsSpawned = false;
             
-            Debug.Log("[CueRadarManager] Reset for new game - radars destroyed, ready to respawn");
+            // Debug.Log("[CueRadarManager] Reset for new game - radars destroyed, ready to respawn");
         }
 
         /// <summary>
