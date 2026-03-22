@@ -13,27 +13,29 @@ namespace OrchestraMaestro
     /// </summary>
     public enum GestureType
     {
+        
         // === Basic Left-Hand Gestures ===
-        UP = 0,             // Crescendo - increase section volume
-        DOWN = 1,           // Decrescendo - decrease section volume
-        LEFT = 2,           // Section cue - switch to left section
-        RIGHT = 3,          // Section cue - switch to right section
-        PUNCH = 4,          // Accent (sforzando) - strong emphasized hit
-        WITHDRAW = 5,       // Cutoff (release) - stop sustained sound
-        V_SHAPE = 6,        // Open/broaden - fuller, louder
-        LAMBDA_SHAPE = 7,   // Close/tighten - softer, controlled
-        TRIANGLE = 8,       // Accelerando - increase tempo
-        CIRCLE = 9,         // Ritardando - decrease tempo
-        S_SHAPE = 10,       // Colour change - timbre swap
+        ERROR = 0,
+        UP = 1,             // Crescendo - increase section volume
+        DOWN = 2,           // Decrescendo - decrease section volume
+        LEFT = 3,           // Section cue - switch to left section
+        RIGHT = 4,          // Section cue - switch to right section
+        PUNCH = 5,          // Accent (sforzando) - strong emphasized hit
+        WITHDRAW = 6,       // Cutoff (release) - stop sustained sound
+        V_SHAPE = 7,        // Open/broaden - fuller, louder
+        LAMBDA_SHAPE = 8,   // Close/tighten - softer, controlled
+        TRIANGLE = 9,       // Accelerando - increase tempo
+        CIRCLE = 10,        // Ritardando - decrease tempo
+        S_SHAPE = 11,       // Colour change - timbre swap
 
         // === Combo Gestures (Left + Right Stick Pattern) ===
-        HOLD = 11,          // Fermata - freeze tempo, sustain chord
-        READY = 12,         // Prep cue - confirm devices stable
-        STRONG_ACCENT = 13, // Emphasized hit (Down-Up-Down stick pattern)
-        CLEAR_CUTOFF = 14,  // Clean stop (Down then hold stick)
-        SUBDIVIDE = 15,     // Widen timing tolerance (Down-Up-Down-Up fast)
-        BRING_OUT = 16,     // Highlight section (Up-Down-Up stick pattern)
-        TRANSITION = 17     // Advance to next phrase (Down-Up-Down-Up then hold)
+        HOLD = 12,          // Fermata - freeze tempo, sustain chord
+        READY = 13,         // Prep cue - confirm devices stable
+        STRONG_ACCENT = 14, // Emphasized hit (Down-Up-Down stick pattern)
+        CLEAR_CUTOFF = 15,  // Clean stop (Down then hold stick)
+        SUBDIVIDE = 16,     // Widen timing tolerance (Down-Up-Down-Up fast)
+        BRING_OUT = 17,     // Highlight section (Up-Down-Up stick pattern)
+        TRANSITION = 18     // Advance to next phrase (Down-Up-Down-Up then hold)
     }
 
     /// <summary>
@@ -198,6 +200,21 @@ namespace OrchestraMaestro
             return gesture == GestureType.TRIANGLE || 
                    gesture == GestureType.CIRCLE ||
                    gesture == GestureType.HOLD;
+        }
+
+        /// <summary>
+        /// Get the display string for a gesture type.
+        /// </summary>
+        public static string ToDisplayString(this GestureType gesture)
+        {
+            return gesture switch
+            {
+                GestureType.V_SHAPE => "V",
+                GestureType.LAMBDA_SHAPE => "λ",
+                GestureType.CIRCLE => "O",
+                GestureType.S_SHAPE => "S",
+                _ => gesture.ToString().Replace("_", " ") // Default for others
+            };
         }
     }
 }

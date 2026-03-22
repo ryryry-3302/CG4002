@@ -30,7 +30,8 @@ namespace OrchestraMaestro
 
         [Header("Topics")]
         [SerializeField] private string leftGestureTopic = "orchestra/left_gesture_event";
-        [SerializeField] private string stickStrokeTopic = "orchestra/stick_stroke";
+        [SerializeField] private string stickStrokeTopic = "ar/right/stick";
+        [SerializeField] private string stickBpmTopic = "ar/right/bpm";
         [SerializeField] private string systemStatusTopic = "orchestra/system_status";
         [SerializeField] private string appStateTopic = "orchestra/app_state";
         [SerializeField] private string controlTopic = "/control/visualizer";
@@ -65,6 +66,7 @@ namespace OrchestraMaestro
         // Events
         public event Action<LeftGestureEvent> OnGestureReceived;
         public event Action<float> OnDownstroke;
+        public event Action<float> OnBpmReceived; // Passes the received BPM value
         public event Action MqttConnected;
         public event Action MqttDisconnected;
         public event Action<string> OnConnectionError;
@@ -139,6 +141,7 @@ namespace OrchestraMaestro
             {
                 leftGestureTopic,
                 stickStrokeTopic,
+                stickBpmTopic,
                 systemStatusTopic
             };
 
@@ -146,6 +149,7 @@ namespace OrchestraMaestro
             {
                 MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE,
                 MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE,
+                MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE, // Changed this line previously missing a value
                 MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE
             };
 
@@ -165,6 +169,7 @@ namespace OrchestraMaestro
             {
                 leftGestureTopic,
                 stickStrokeTopic,
+                stickBpmTopic,
                 systemStatusTopic
             };
 
@@ -234,6 +239,8 @@ namespace OrchestraMaestro
                 HandleGestureMessage(message);
             else if (topic == stickStrokeTopic)
                 HandleStickMessage(message);
+            else if (topic == stickBpmTopic)
+                HandleBpmMessage(message);
             else if (topic == systemStatusTopic)
                 HandleStatusMessage(message);
             else if (enableTestRead && topic == testReadTopic)
@@ -343,25 +350,49 @@ namespace OrchestraMaestro
                 if (string.Equals(normalized, "DOWN", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(normalized, "DOWNSTROKE", StringComparison.OrdinalIgnoreCase))
                 {
-                    strokeType = "DOWNSTROKE";
+                    strokeType = normalized;
                 }
                 else if (string.Equals(normalized, "UP", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(normalized, "UPSTROKE", StringComparison.OrdinalIgnoreCase))
                 {
-                    strokeType = "UPSTROKE";
+                    strokeType = normalized;
                 }
             }
 
-            if (string.Equals(strokeType, "DOWNSTROKE", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(strokeType, "DOWN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(strokeType, "DOWNSTROKE", StringComparison.OrdinalIgnoreCase))
             {
                 float localTime = Time.time;
                 downstrokeBuffer.Enqueue(localTime);
                 Log($"Downstroke at {localTime:F3}");
                 OnDownstroke?.Invoke(localTime);
             }
+            else if (string.Equals(strokeType, "UP", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(strokeType, "UPSTROKE", StringComparison.OrdinalIgnoreCase))
+            {
+                // We don't currently have an OnUpstroke event, but we acknowledge receipt.
+                Log($"Upstroke received at {Time.time:F3}");
+            }
             else if (debugLogging)
             {
                 Log($"Ignored stick message: {normalized}");
+            }
+        }
+
+        private void HandleBpmMessage(string message)
+        {
+            string normalized = (message ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized)) return;
+
+            try
+            {
+                BpmEvent evt = JsonUtility.FromJson<BpmEvent>(normalized);
+                Log($"BPM received: {evt.bpm}");
+                OnBpmReceived?.Invoke(evt.bpm);
+            }
+            catch (Exception e)
+            {
+                LogWarning($"Failed to parse BPM message: {e.Message}");
             }
         }
 
@@ -488,6 +519,13 @@ namespace OrchestraMaestro
         {
             public string state;
             public long timestamp;
+        }
+
+        [Serializable]
+        private class BpmEvent
+        {
+            public float bpm;
+            public long time;
         }
 
         #endregion

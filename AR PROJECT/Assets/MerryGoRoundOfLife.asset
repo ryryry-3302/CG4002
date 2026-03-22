@@ -15,6 +15,6 @@ MonoBehaviour:
   songName: Merry Go Round of Life (Howl's Moving Castle)
   artistName: Joe Hisaishi
   audioClip: {fileID: 8300000, guid: ea35400c46d07aab5aafe01e7c6196a1, type: 3}
-  bpm: 172
-  offset: 0
+  bpm: 172.27
+  offset: 0.72
   rhythmMapJson: {fileID: 4900000, guid: 70fa218fc415c5a70b3551ceb9fb89eb, type: 3}

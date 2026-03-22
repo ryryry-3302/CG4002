@@ -15,6 +15,6 @@ MonoBehaviour:
   songName: Dance of the Sugar Plum Fairy
   artistName: Pyotr Ilyich Tchaikovsky
   audioClip: {fileID: 8300000, guid: d941608617bf751a781c6ef192d9b052, type: 3}
-  bpm: 100
-  offset: 0
+  bpm: 99.38
+  offset: 0.139
   rhythmMapJson: {fileID: 4900000, guid: 7ebf97a39737f46d88a3ca39247ee23e, type: 3}

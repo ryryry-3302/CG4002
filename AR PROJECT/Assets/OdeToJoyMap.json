@@ -1,204 +1,93 @@
 {
   "cues": [
     {
-      "timestamp": 4.39,
-      "gestureId": "DOWN",
-      "section": "drum"
-    },
-    {
-      "timestamp": 8.52,
-      "gestureId": "PUNCH",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 12.79,
-      "gestureId": "UP",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 16.9,
-      "gestureId": "DOWN",
-      "section": "flute"
-    },
-    {
-      "timestamp": 21.06,
-      "gestureId": "PUNCH",
-      "section": "drum"
-    },
-    {
-      "timestamp": 25.08,
-      "gestureId": "UP",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 29.26,
-      "gestureId": "DOWN",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 33.67,
-      "gestureId": "PUNCH",
-      "section": "flute"
-    },
-    {
-      "timestamp": 37.89,
-      "gestureId": "UP",
-      "section": "drum"
-    },
-    {
-      "timestamp": 42.05,
-      "gestureId": "DOWN",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 46.28,
-      "gestureId": "PUNCH",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 50.48,
-      "gestureId": "UP",
-      "section": "flute"
-    },
-    {
-      "timestamp": 54.68,
-      "gestureId": "DOWN",
-      "section": "drum"
-    },
-    {
-      "timestamp": 58.86,
-      "gestureId": "PUNCH",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 63.07,
-      "gestureId": "UP",
-      "section": "xylophone"
-    },
-    {
       "timestamp": 67.27,
-      "gestureId": "DOWN",
+      "gestureId": "CIRCLE",
       "section": "flute"
     },
     {
-      "timestamp": 71.47,
-      "gestureId": "PUNCH",
+      "timestamp": 108.07,
+      "gestureId": "S_SHAPE",
       "section": "drum"
     },
     {
-      "timestamp": 75.67,
+      "timestamp": 112.29,
       "gestureId": "UP",
       "section": "pipe"
     },
     {
-      "timestamp": 79.88,
+      "timestamp": 116.47,
       "gestureId": "DOWN",
       "section": "xylophone"
     },
     {
-      "timestamp": 84.08,
+      "timestamp": 120.67,
       "gestureId": "PUNCH",
       "section": "flute"
     },
     {
-      "timestamp": 88.28,
-      "gestureId": "UP",
+      "timestamp": 124.85,
+      "gestureId": "WITHDRAW",
       "section": "drum"
     },
     {
-      "timestamp": 92.46,
-      "gestureId": "DOWN",
+      "timestamp": 129.06,
+      "gestureId": "V_SHAPE",
       "section": "pipe"
     },
     {
-      "timestamp": 96.69,
-      "gestureId": "PUNCH",
+      "timestamp": 133.07,
+      "gestureId": "LAMBDA_SHAPE",
       "section": "xylophone"
     },
     {
-      "timestamp": 100.87,
-      "gestureId": "UP",
+      "timestamp": 137.46,
+      "gestureId": "TRIANGLE",
       "section": "flute"
     },
     {
-      "timestamp": 105.07,
-      "gestureId": "DOWN",
+      "timestamp": 141.48,
+      "gestureId": "CIRCLE",
       "section": "drum"
     },
     {
-      "timestamp": 109.27,
-      "gestureId": "PUNCH",
+      "timestamp": 145.68,
+      "gestureId": "S_SHAPE",
       "section": "pipe"
     },
     {
-      "timestamp": 113.48,
+      "timestamp": 150.07,
       "gestureId": "UP",
       "section": "xylophone"
     },
     {
-      "timestamp": 117.66,
+      "timestamp": 154.27,
       "gestureId": "DOWN",
       "section": "flute"
     },
     {
-      "timestamp": 121.86,
+      "timestamp": 158.48,
       "gestureId": "PUNCH",
       "section": "drum"
     },
     {
-      "timestamp": 126.06,
-      "gestureId": "UP",
+      "timestamp": 162.68,
+      "gestureId": "WITHDRAW",
       "section": "pipe"
     },
     {
-      "timestamp": 130.26,
-      "gestureId": "DOWN",
+      "timestamp": 166.86,
+      "gestureId": "V_SHAPE",
       "section": "xylophone"
     },
     {
-      "timestamp": 134.47,
-      "gestureId": "PUNCH",
-      "section": "flute"
-    },
-    {
-      "timestamp": 138.48,
-      "gestureId": "UP",
-      "section": "drum"
-    },
-    {
-      "timestamp": 142.66,
-      "gestureId": "DOWN",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 146.87,
-      "gestureId": "PUNCH",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 150.88,
-      "gestureId": "UP",
-      "section": "flute"
-    },
-    {
-      "timestamp": 155.48,
-      "gestureId": "DOWN",
-      "section": "drum"
-    },
-    {
-      "timestamp": 159.66,
-      "gestureId": "PUNCH",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 163.68,
-      "gestureId": "UP",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 168.07,
-      "gestureId": "DOWN",
+      "timestamp": 171.08,
+      "gestureId": "LAMBDA_SHAPE",
       "section": "flute"
     }
-  ]
+  ],
+  "tempoSection": {
+    "start": 72.78,
+    "end": 102.78
+  }
 }

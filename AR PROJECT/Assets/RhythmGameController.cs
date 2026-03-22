@@ -86,6 +86,9 @@ namespace OrchestraMaestro
 
         /// <summary>Current playback time in seconds. 0 if no map.</summary>
         public float CurrentSongTime => rhythmMap != null ? rhythmMap.CurrentSongTime : 0f;
+        
+        public float TempoSectionStart => rhythmMap != null ? rhythmMap.TempoSectionStart : -1f;
+        public float TempoSectionEnd => rhythmMap != null ? rhythmMap.TempoSectionEnd : -1f;
         private float tutorialWrongGestureTime;
         private bool endingSfxPlayed;
 

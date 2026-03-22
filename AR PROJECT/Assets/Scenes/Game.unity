@@ -552,15 +552,18 @@ MonoBehaviour:
   caCertAsset: {fileID: 4900000, guid: 576ea145d95aa6f3982b75ffaa9f0e80, type: 3}
   clientPfxAsset: {fileID: 4900000, guid: cc2d277e7f5032b88b9d56353799065e, type: 3}
   pfxPassword: cegb18
-  useLocalTesting: 1
+  useLocalTesting: 0
   localBrokerIP: 10.238.212.169
   localBrokerPort: 1883
   leftGestureTopic: orchestra/left_gesture_event
-  stickStrokeTopic: orchestra/stick_stroke
+  stickStrokeTopic: ar/right/stick
+  stickBpmTopic: ar/right/bpm
   systemStatusTopic: orchestra/system_status
   appStateTopic: orchestra/app_state
   controlTopic: /control/visualizer
   rightCommandTopic: ar/right/cmd
+  autoReconnect: 1
+  reconnectInterval: 5
   stickBufferDuration: 2
   debugLogging: 1
   enableTestPublish: 0
@@ -2362,7 +2365,7 @@ MonoBehaviour:
   missColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   highlightIntensity: 2
   feedbackDuration: 0.5
-  prefabScale: 0.1
+  prefabScale: 0.07
   selectorHaloPrefab: {fileID: 3744133877081091469, guid: a2a060732547fe64581bb0cb3c2bdf1d, type: 3}
 --- !u!4 &1141421496
 Transform:

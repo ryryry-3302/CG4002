@@ -55,6 +55,9 @@ namespace OrchestraMaestro
 
         /// <summary>Timestamp of the first cue in the map, or float.MaxValue if no cues.</summary>
         public float FirstCueTimestamp => cues.Count > 0 ? cues[0].timestamp : float.MaxValue;
+        
+        public float TempoSectionStart { get; private set; } = -1f;
+        public float TempoSectionEnd { get; private set; } = -1f;
 
         #region Map Loading
 
@@ -83,6 +86,17 @@ namespace OrchestraMaestro
 
                 // Sort by timestamp
                 cues.Sort((a, b) => a.timestamp.CompareTo(b.timestamp));
+                
+                if (data.tempoSection != null)
+                {
+                    TempoSectionStart = data.tempoSection.start;
+                    TempoSectionEnd = data.tempoSection.end;
+                }
+                else
+                {
+                    TempoSectionStart = -1f;
+                    TempoSectionEnd = -1f;
+                }
                 
                 Debug.Log($"[RhythmMap] Loaded {cues.Count} cues");
             }
@@ -485,23 +499,31 @@ namespace OrchestraMaestro
         }
 
         #endregion
-
-        #region JSON Data Classes
-
-        [Serializable]
-        private class RhythmMapData
-        {
-            public RhythmCueData[] cues;
-        }
-
-        [Serializable]
-        private class RhythmCueData
-        {
-            public float timestamp;
-            public string gestureId;
-            public string section;
-        }
-
-        #endregion
     }
+
+    #region JSON Data Classes
+
+    [Serializable]
+    public class TempoSectionData
+    {
+        public float start;
+        public float end;
+    }
+
+    [Serializable]
+    public class RhythmMapData
+    {
+        public RhythmCueData[] cues;
+        public TempoSectionData tempoSection;
+    }
+
+    [Serializable]
+    public class RhythmCueData
+    {
+        public float timestamp;
+        public string gestureId;
+        public string section;
+    }
+
+    #endregion
 }

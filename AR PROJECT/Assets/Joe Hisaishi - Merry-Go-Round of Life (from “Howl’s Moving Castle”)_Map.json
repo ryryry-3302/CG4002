@@ -1,5 +1,51 @@
 {
   "cues": [
+
+    {
+      "timestamp": 9.06,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 13.17,
+      "gestureId": "WITHDRAW",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 17.25,
+      "gestureId": "V_SHAPE",
+      "section": "flute"
+    },
+    {
+      "timestamp": 21.34,
+      "gestureId": "LAMBDA_SHAPE",
+      "section": "drum"
+    },
+    {
+      "timestamp": 25.4,
+      "gestureId": "TRIANGLE",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 29.49,
+      "gestureId": "CIRCLE",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 33.53,
+      "gestureId": "S_SHAPE",
+      "section": "flute"
+    },
+    {
+      "timestamp": 37.55,
+      "gestureId": "UP",
+      "section": "drum"
+    },
+    {
+      "timestamp": 41.87,
+      "gestureId": "DOWN",
+      "section": "pipe"
+    },
     {
       "timestamp": 45.98,
       "gestureId": "PUNCH",
@@ -7,133 +53,92 @@
     },
     {
       "timestamp": 50.2,
-      "gestureId": "UP",
+      "gestureId": "WITHDRAW",
       "section": "flute"
     },
     {
       "timestamp": 54.38,
-      "gestureId": "DOWN",
+      "gestureId": "V_SHAPE",
       "section": "drum"
     },
     {
       "timestamp": 58.49,
-      "gestureId": "PUNCH",
+      "gestureId": "LAMBDA_SHAPE",
       "section": "pipe"
     },
     {
       "timestamp": 62.53,
-      "gestureId": "UP",
+      "gestureId": "TRIANGLE",
       "section": "xylophone"
     },
     {
-      "timestamp": 66.57,
-      "gestureId": "DOWN",
+      "timestamp": 102.77,
+      "gestureId": "CIRCLE",
       "section": "flute"
     },
     {
-      "timestamp": 70.66,
-      "gestureId": "PUNCH",
+      "timestamp": 106.81,
+      "gestureId": "S_SHAPE",
       "section": "drum"
     },
     {
-      "timestamp": 74.84,
+      "timestamp": 110.99,
       "gestureId": "UP",
       "section": "pipe"
     },
     {
-      "timestamp": 79.13,
+      "timestamp": 115.29,
       "gestureId": "DOWN",
       "section": "xylophone"
     },
     {
-      "timestamp": 83.15,
+      "timestamp": 119.33,
       "gestureId": "PUNCH",
       "section": "flute"
     },
     {
-      "timestamp": 87.17,
-      "gestureId": "UP",
+      "timestamp": 123.41,
+      "gestureId": "WITHDRAW",
       "section": "drum"
     },
     {
-      "timestamp": 91.23,
-      "gestureId": "DOWN",
+      "timestamp": 127.52,
+      "gestureId": "V_SHAPE",
       "section": "pipe"
     },
     {
-      "timestamp": 95.32,
-      "gestureId": "PUNCH",
+      "timestamp": 131.56,
+      "gestureId": "LAMBDA_SHAPE",
       "section": "xylophone"
     },
     {
-      "timestamp": 99.4,
-      "gestureId": "UP",
+      "timestamp": 135.7,
+      "gestureId": "TRIANGLE",
       "section": "flute"
     },
     {
-      "timestamp": 103.44,
-      "gestureId": "DOWN",
+      "timestamp": 139.81,
+      "gestureId": "CIRCLE",
       "section": "drum"
     },
     {
-      "timestamp": 107.51,
-      "gestureId": "PUNCH",
+      "timestamp": 143.89,
+      "gestureId": "S_SHAPE",
       "section": "pipe"
     },
     {
-      "timestamp": 111.62,
+      "timestamp": 148.21,
       "gestureId": "UP",
       "section": "xylophone"
     },
     {
-      "timestamp": 115.68,
+      "timestamp": 152.32,
       "gestureId": "DOWN",
       "section": "flute"
-    },
-    {
-      "timestamp": 119.7,
-      "gestureId": "PUNCH",
-      "section": "drum"
-    },
-    {
-      "timestamp": 123.76,
-      "gestureId": "UP",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 127.85,
-      "gestureId": "DOWN",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 131.91,
-      "gestureId": "PUNCH",
-      "section": "flute"
-    },
-    {
-      "timestamp": 136.05,
-      "gestureId": "UP",
-      "section": "drum"
-    },
-    {
-      "timestamp": 140.16,
-      "gestureId": "DOWN",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 144.24,
-      "gestureId": "PUNCH",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 148.54,
-      "gestureId": "UP",
-      "section": "flute"
-    },
-    {
-      "timestamp": 152.65,
-      "gestureId": "DOWN",
-      "section": "drum"
     }
-  ]
+  ],
+  "tempoSection": {
+    "start": 67.77,
+    "end": 97.77
+  }
 }

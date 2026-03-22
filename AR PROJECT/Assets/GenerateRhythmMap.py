@@ -56,17 +56,32 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
 
     print(f"Total unique musical events: {len(filtered_times)}")
 
+    # Tempo section logic (30 seconds halfway through the song)
+    halfway = duration / 2.0
+    tempo_start = halfway - 15.0
+    tempo_end = halfway + 15.0
+
+    # No cue zone logic: 5 seconds before start and 5 seconds after end
+    no_cue_start = tempo_start - 5.0
+    no_cue_end = tempo_end + 5.0
+
     # Sections and gestures to cycle through
     sections = ["flute", "drum", "pipe", "xylophone"]
-    gestures = ["UP", "DOWN", "PUNCH"]
+    gestures = ["UP", "DOWN", "PUNCH", "WITHDRAW", "V_SHAPE", "LAMBDA_SHAPE", "TRIANGLE", "CIRCLE", "S_SHAPE"]
 
     cues = []
-    last_cue_time = -min_interval  # Ensure first event can be picked
+    
+    # We want cues to skip the tempo section zone (including 5s buffers)
+    last_cue_time = 0.0 - min_interval  
 
     section_index = 0
     gesture_index = 0
 
     for t in filtered_times:
+        # Skip cues that fall into the restricted zone
+        if t >= no_cue_start and t <= no_cue_end:
+            continue
+            
         if t - last_cue_time >= min_interval:
             cue = {
                 "timestamp": round(float(t), 2),
@@ -80,7 +95,7 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
             gesture_index += 1
 
     # Wrap in root object
-    data = {"cues": cues}
+    data = {"cues": cues, "tempoSection": {"start": round(tempo_start, 2), "end": round(tempo_end, 2)}}
 
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=2)

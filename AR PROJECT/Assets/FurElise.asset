@@ -15,6 +15,6 @@ MonoBehaviour:
   songName: Fur Elise
   artistName: Beethoven
   audioClip: {fileID: 8300000, guid: 20518163e51e95e7ea702b0ad023cc67, type: 3}
-  bpm: 123
-  offset: 0
+  bpm: 123.05
+  offset: 0.58
   rhythmMapJson: {fileID: 4900000, guid: 3d98a808d8bd86139b123d1049728961, type: 3}

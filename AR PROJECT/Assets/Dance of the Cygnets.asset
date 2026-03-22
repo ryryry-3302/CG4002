@@ -15,6 +15,6 @@ MonoBehaviour:
   songName: Dance of the Cygnets
   artistName: Tchaikovsky
   audioClip: {fileID: 8300000, guid: 9e7c1fd75573363678a22aa4fa419333, type: 3}
-  bpm: 185
-  offset: 0
+  bpm: 184.57
+  offset: 3.088
   rhythmMapJson: {fileID: 4900000, guid: 65c4a3ab824959443ac48df0674d55af, type: 3}

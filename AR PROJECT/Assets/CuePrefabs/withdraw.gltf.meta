@@ -1,0 +1,115 @@
+fileFormatVersion: 2
+guid: 8dd287b5dc6554ccf9f8c9104e8813e1
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 0.105882_0.372549_0.666667_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 0.376471_0.415686_0.450980_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 0.564706_0.811765_0.945098_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 0.603922_0.647059_0.686275_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 0.811765_0.858824_0.898039_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 0.850980_0.756863_0.870588_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 0.866667_0.321569_0.156863_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: 1.000000_0.756863_0.054902_0.000000_0.000000
+    second: {fileID: -2840136634868304333, guid: aaacbe2391aeb0964a5e36b85ba3d06c, type: 3}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 804e1ce4c496647cfa3f1a1134187c71, type: 3}
+  _removeEmptyRootObjects: 1
+  _scaleFactor: 1
+  _deduplicateResources: 0
+  _deduplicatedStatistics:
+    meshCountBefore: 0
+    meshCountAfter: 0
+    textureCountBefore: 0
+    textureCountAfter: 0
+  _maximumLod: 300
+  _readWriteEnabled: 1
+  _generateColliders: 0
+  _addColliders: 0
+  _swapUvs: 0
+  _generateLightmapUVs: 0
+  _importBlendShapeNames: 1
+  _blendShapeFrameWeight:
+    _option: 0
+    _multiplier: 1
+  _importNormals: 0
+  _importTangents: 0
+  _importCamera: 2
+  _importAnimations: 2
+  _mecanimHumanoidFlip: 0
+  _addAnimatorComponent: 0
+  _animationLoopTime: 1
+  _animationLoopPose: 0
+  _importMaterials: 1
+  _enableGpuInstancing: 0
+  _texturesReadWriteEnabled: 1
+  _generateMipMaps: 1
+  _useSceneNameIdentifier: 1
+  _textureCompression: -50
+  _gltfAsset: '<b>Generator: </b>ONSHAPE BY PTC INC, 1.212
+
+    <b>Version: </b>2.0
+
+
+    <b>Extras:
+    </b>
+
+'
+  optimizeGameObjects: 0
+  materials:
+  - {fileID: -465237401229034894, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  - {fileID: 5758866171060451625, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  - {fileID: -736425403689035340, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  - {fileID: 581781387648366341, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  - {fileID: 4569668441572192924, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  - {fileID: 292797492251740623, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  - {fileID: 9212217454841600735, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  - {fileID: -5804700991381979243, guid: 8dd287b5dc6554ccf9f8c9104e8813e1, type: 3}
+  textures: []
+  hasSceneData: 1
+  hasAnimationData: 0
+  hasMaterialData: 1
+  hasTextureData: 0
+  animations: []
+  _extensions:
+  - name: PTC_onshape_metadata
+    supported: 1
+    used: 1
+    required: 0
+  _textures: []
+  _mainAssetIdentifier: scenes/Root
+  _importPlugins: []

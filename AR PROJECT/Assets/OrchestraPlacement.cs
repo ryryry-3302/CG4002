@@ -66,6 +66,14 @@ public class OrchestraPlacement : MonoBehaviour
     private const float SectionPlayDuration = 10f;
     private Dictionary<OrchestraSection, float> sectionAnimationEndTime = new Dictionary<OrchestraSection, float>();
     
+    // BPM feedback
+    private float currentStickBpm = 0f;
+
+    // Tempo keeping variables
+    private float totalTempoAccuracy = 0f;
+    private int tempoSamples = 0;
+    private float finalTempoScore = -1f;
+
     // Custom GUI styles (lazy-initialized)
     private GUIStyle headerStyle;
     private GUIStyle labelStyle;
@@ -125,6 +133,11 @@ public class OrchestraPlacement : MonoBehaviour
                 "Welcome! Let's set up your orchestra. Tap a plane to place each musician, or use Auto Place for quick setup.",
                 () => tutorialStep = 1);
         }
+
+        if (MQTTManager.Instance != null)
+        {
+            MQTTManager.Instance.OnBpmReceived += HandleBpmReceived;
+        }
     }
 
     private void EnsureTutorialDialogController()
@@ -136,6 +149,11 @@ public class OrchestraPlacement : MonoBehaviour
         }
     }
     
+    private void HandleBpmReceived(float bpm)
+    {
+        currentStickBpm = bpm;
+    }
+
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
@@ -144,6 +162,11 @@ public class OrchestraPlacement : MonoBehaviour
         if (RhythmGameController.Instance != null)
         {
             RhythmGameController.Instance.OnGestureJudged -= OnGestureJudgedHUD;
+        }
+
+        if (MQTTManager.Instance != null)
+        {
+            MQTTManager.Instance.OnBpmReceived -= HandleBpmReceived;
         }
     }
 
@@ -168,6 +191,47 @@ public class OrchestraPlacement : MonoBehaviour
         // Tick judgement display timer
         if (judgementTimer > 0)
             judgementTimer -= Time.deltaTime;
+
+        // Tempo keeping logic
+        var ctrl = RhythmGameController.Instance;
+        if (ctrl != null && !isPlacementMode)
+        {
+            if (ctrl.CurrentState == RhythmGameController.GameState.Setup)
+            {
+                // Reset tempo variables for new session
+                totalTempoAccuracy = 0f;
+                tempoSamples = 0;
+                finalTempoScore = -1f;
+            }
+
+            float t = ctrl.CurrentSongTime;
+            float targetBpm = ctrl.CurrentSong != null ? ctrl.CurrentSong.bpm : 0f;
+            float tempoStart = ctrl.TempoSectionStart;
+            float tempoEnd = ctrl.TempoSectionEnd;
+            
+            if (tempoStart > 0 && t >= tempoStart && t < tempoEnd && targetBpm > 0 && currentStickBpm > 0)
+            {
+                float absDiff = Mathf.Abs(currentStickBpm - targetBpm);
+                float accuracy = Mathf.Clamp01(1f - (absDiff / 20f)); // 20 BPM diff = 0 score, 0 diff = 1 score
+                totalTempoAccuracy += accuracy;
+                tempoSamples++;
+            }
+            else if (tempoStart > 0 && t >= tempoEnd && t < tempoEnd + 0.5f && finalTempoScore < 0)
+            {
+                finalTempoScore = tempoSamples > 0 ? (totalTempoAccuracy / tempoSamples) * 100f : 0f;
+            }
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // Simulate BPM input without MQTT server
+        if (Input.GetKey(KeyCode.UpArrow))
+            currentStickBpm += 30f * Time.deltaTime;
+        if (Input.GetKey(KeyCode.DownArrow))
+            currentStickBpm -= 30f * Time.deltaTime;
+        
+        // Ensure it doesn't drop below 0
+        currentStickBpm = Mathf.Max(0, currentStickBpm);
+#endif
 
         // When in game: stop section animations after SectionPlayDuration
         if (!isPlacementMode && sectionAnimationEndTime.Count > 0)
@@ -1243,6 +1307,160 @@ public class OrchestraPlacement : MonoBehaviour
         labelStyle.fontStyle = FontStyle.Bold;
         labelStyle.wordWrap = true;
         DrawOutlinedLabel(new Rect(10, 6, 220f, 44f), $"{songTitle}  {timeStr}", labelStyle, new Color(0.85f, 0.88f, 0.95f));
+        
+        // ── Top-left below: BPM Info ──
+        float targetBpm = ctrl?.CurrentSong != null ? ctrl.CurrentSong.bpm : 0f;
+        string bpmText = $"Target BPM: {(targetBpm > 0 ? targetBpm.ToString("F0") : "--")}\nStick BPM: {(currentStickBpm > 0 ? currentStickBpm.ToString("F0") : "--")}";
+        
+        // Change color based on if current stick BPM is close to target BPM
+        Color bpmColor = Color.white;
+        float bpmDiff = targetBpm > 0 && currentStickBpm > 0 ? currentStickBpm - targetBpm : 0f; // Positive means stick is faster, Negative means stick is slower
+        float absDiff = Mathf.Abs(bpmDiff);
+
+        if (targetBpm > 0 && currentStickBpm > 0)
+        {
+            if (absDiff <= 5f) bpmColor = perfectColor;
+            else if (absDiff <= 15f) bpmColor = goodColor;
+            else bpmColor = missColor;
+        }
+        
+        DrawOutlinedLabel(new Rect(10, 46, 220f, 44f), bpmText, labelStyle, bpmColor);
+
+        float tempoStart = ctrl != null ? ctrl.TempoSectionStart : -1f;
+        float tempoEnd = ctrl != null ? ctrl.TempoSectionEnd : -1f;
+
+        // ── Pre-Tempo Section Preparation (5 seconds before) ──
+        if (tempoStart > 0 && t >= tempoStart - 5.0f && t < tempoStart)
+        {
+            float w = 300f;
+            float x = (sw - w) / 2f;
+            float y = sh / 2f - 40f;
+            
+            int savedSize = labelStyle.fontSize;
+            bool savedWrap = labelStyle.wordWrap;
+            labelStyle.wordWrap = false;
+            
+            labelStyle.fontSize = 24;
+            labelStyle.alignment = TextAnchor.MiddleCenter;
+            DrawOutlinedLabel(new Rect(x - 50, y, w + 100, 30), "Get ready to keep tempo!", labelStyle, new Color(1f, 0.8f, 0.2f));
+            
+            // Visual metronome reference 
+            float beatInterval = 60f / targetBpm;
+            float songOffset = ctrl?.CurrentSong != null ? ctrl.CurrentSong.offset : 0f;
+            float timeSinceBeat = (t - songOffset) % beatInterval;
+            if (timeSinceBeat < 0) timeSinceBeat += beatInterval;
+
+            float pulseScale = 1f + Mathf.Max(0, 1f - (timeSinceBeat / 0.15f)) * 0.5f; // Quick pulse on beat
+            
+            labelStyle.fontSize = Mathf.RoundToInt(18 * pulseScale);
+            DrawOutlinedLabel(new Rect(x - 50, y + 40, w + 100, 30), $"Target: {targetBpm:F0} BPM", labelStyle, pulseScale > 1.1f ? Color.white : new Color(0.6f, 0.6f, 0.6f));
+            
+            labelStyle.wordWrap = savedWrap;
+            labelStyle.fontSize = savedSize;
+        }
+        // ── Tuning Gauge (Only visible during the tempo section) ──
+        else if (tempoStart > 0 && t >= tempoStart && t < tempoEnd && targetBpm > 0)
+        {
+            float gaugeW = 240f;
+            float gaugeH = 16f;
+            float gaugeX = (sw - gaugeW) / 2f;
+            float gaugeY = sh / 2f - 10f; // Shifted slightly down for better centering
+            
+            // Draw text
+            string adviceText = "Keep Tempo";
+            if (currentStickBpm <= 0)
+                adviceText = "Start Conducting!";
+            else if (absDiff > 5f) 
+                adviceText = bpmDiff > 0 ? "Slow Down!" : "Speed Up!";
+                
+            int savedSize = labelStyle.fontSize;
+            bool savedWrap = labelStyle.wordWrap;
+            labelStyle.wordWrap = false; // Prevent wrap-shifting inside DrawOutlinedLabel
+            
+            labelStyle.fontSize = 22;
+            labelStyle.alignment = TextAnchor.MiddleCenter;
+            DrawOutlinedLabel(new Rect(gaugeX - 50, gaugeY - 35, gaugeW + 100, 30), adviceText, labelStyle, bpmColor);
+
+            // Background track
+            Color oldGuiColor = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.5f);
+            GUI.DrawTexture(new Rect(gaugeX, gaugeY, gaugeW, gaugeH), texSliderBg);
+            GUI.color = oldGuiColor;
+            
+            // Draw marker
+            // Map [-30 BPM, +30 BPM] difference to [-gaugeW/2, +gaugeW/2]
+            float maxDiffVisualized = 30f; 
+            float activeDiff = currentStickBpm > 0 ? bpmDiff : -maxDiffVisualized;
+            float markerPct = Mathf.Clamp(activeDiff / maxDiffVisualized, -1f, 1f); 
+            float markerX = gaugeX + (gaugeW / 2f) + (markerPct * (gaugeW / 2f));
+            
+            Color fillCol = currentStickBpm > 0 ? bpmColor : Color.gray;
+            texSliderFill.SetPixel(0, 0, new Color(fillCol.r, fillCol.g, fillCol.b, 1f));
+            texSliderFill.Apply();
+            GUI.DrawTexture(new Rect(markerX - 3, gaugeY - 4, 6, gaugeH + 8), texSliderFill);
+            
+            // Visual beat pulse for the target center line
+            float beatInterval = 60f / targetBpm;
+            float songOffset = ctrl?.CurrentSong != null ? ctrl.CurrentSong.offset : 0f;
+            float timeSinceBeat = (t - songOffset) % beatInterval;
+            if (timeSinceBeat < 0) timeSinceBeat += beatInterval;
+            float pulseActive = timeSinceBeat < 0.15f ? 1f : 0f;
+            
+            // Target center line (flashes white on beat)
+            Color oldCol = GUI.color;
+            GUI.color = pulseActive > 0 ? Color.white : new Color(1f, 1f, 1f, 0.5f);
+            GUI.DrawTexture(new Rect(gaugeX + gaugeW / 2f - (1 + pulseActive), gaugeY - 6 - (pulseActive * 2), 2 + (pulseActive * 2), gaugeH + 12 + (pulseActive * 4)), texSliderMarker);
+            GUI.color = oldCol;
+            
+            // Instructions below gauge
+            labelStyle.fontSize = 13;
+            DrawOutlinedLabel(new Rect(gaugeX - 50, gaugeY + 24, gaugeW + 100, 20), "Tempo Section - maintain target BPM", labelStyle, new Color(0.8f, 0.8f, 0.8f));
+            
+            labelStyle.wordWrap = savedWrap;
+            labelStyle.fontSize = savedSize;
+        }
+        else if (tempoStart > 0 && t >= tempoEnd && t < tempoEnd + 3.0f && finalTempoScore >= 0f)
+        {
+            // Show score for 3 seconds
+            float alpha = 1f;
+            if (t >= tempoEnd + 2.0f) alpha = 3.0f - (t - tempoEnd); // fade out last second
+
+            float scoreW = 300f;
+            float scoreX = (sw - scoreW) / 2f;
+            float scoreY = sh / 2f - 30f;
+            
+            int savedSize = labelStyle.fontSize;
+            labelStyle.alignment = TextAnchor.MiddleCenter;
+            
+            // "Tempo Warmup Complete"
+            labelStyle.fontSize = 16;
+            Color textColor = new Color(1f, 1f, 1f, alpha);
+            DrawOutlinedLabel(new Rect(scoreX, scoreY, scoreW, 20), "Tempo Section Complete!", labelStyle, textColor);
+
+            // Give a rating and color based on score
+            string rating = "Needs Work";
+            Color ratingColor = missColor;
+            if (finalTempoScore >= 90f) { rating = "Perfect Rhythm!"; ratingColor = perfectColor; }
+            else if (finalTempoScore >= 70f) { rating = "Good Tempo!"; ratingColor = goodColor; }
+
+            ratingColor.a = alpha;
+            labelStyle.fontSize = 24;
+            DrawOutlinedLabel(new Rect(scoreX, scoreY + 25, scoreW, 30), $"{finalTempoScore:F0}% - {rating}", labelStyle, ratingColor);
+            
+            labelStyle.fontSize = savedSize;
+        }
+
+        // ── Mobile BPM Controls (Visible for testing) ──
+        if (GUI.Button(new Rect(10, 110, 50, 25), "-5 BPM"))
+        {
+            currentStickBpm = Mathf.Max(0, currentStickBpm - 5f);
+        }
+        if (GUI.Button(new Rect(70, 110, 50, 25), "+5 BPM"))
+        {
+            if (currentStickBpm == 0) currentStickBpm = targetBpm; // Snap to target if just starting
+            else currentStickBpm += 5f;
+        }
+
         labelStyle.wordWrap = false;
         labelStyle.fontStyle = FontStyle.Normal;
         labelStyle.fontSize = savedLabelSize;
