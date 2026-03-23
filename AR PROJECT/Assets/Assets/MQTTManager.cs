@@ -312,6 +312,8 @@ namespace OrchestraMaestro
             try
             {
                 LeftGestureEvent evt = JsonUtility.FromJson<LeftGestureEvent>(json);
+                evt.Normalize();
+                
                 Log($"Gesture received: {evt.gestureId} (clenched: {evt.isClenched})");
                 OnGestureReceived?.Invoke(evt);
             }

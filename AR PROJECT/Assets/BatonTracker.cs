@@ -381,6 +381,9 @@ public class BatonTracker : MonoBehaviour
             }
         }
 
+        // Extend the tip by 1.5x the length of the green blob to account for the un-taped part of the stick
+        tip = tip + (tip - baseEnd) * 1.5f;
+
         BlobTipScreen = ImageToScreen(tip);
         BlobBaseScreen = ImageToScreen(baseEnd);
 

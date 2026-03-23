@@ -290,11 +290,20 @@ void updateStickUpDown() {
           strokeHead = (strokeHead + 1) % BPM_WINDOW_SIZE;
           if (strokeCount < BPM_WINDOW_SIZE) strokeCount++;
           
-          uint32_t totalInterval = 0;
+          float weightedSum = 0.0f;
+          float weightTotal = 0.0f;
+          float currentWeight = 1.0f;
+          const float DECAY_FACTOR = 0.6f; // Much heavier weight on most recent strokes
+
           for (int i = 0; i < strokeCount; i++) {
-            totalInterval += strokeIntervals[i];
+            // Iterate backwards from most recent stroke
+            int index = (strokeHead - 1 - i + BPM_WINDOW_SIZE) % BPM_WINDOW_SIZE;
+            weightedSum += strokeIntervals[index] * currentWeight;
+            weightTotal += currentWeight;
+            currentWeight *= DECAY_FACTOR;
           }
-          float avgInterval = (float)totalInterval / strokeCount;
+          
+          float avgInterval = weightedSum / weightTotal;
           float bpm = 60000.0f / avgInterval;
           Serial.print("BPM: ");
           Serial.println(bpm);

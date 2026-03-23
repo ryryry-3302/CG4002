@@ -95,13 +95,41 @@ namespace OrchestraMaestro
     public struct LeftGestureEvent
     {
         public string gestureId;
+        public string inference;
         public bool isClenched;
         public long timestamp;
         public float confidence;
 
+        public void Normalize()
+        {
+            if (string.IsNullOrEmpty(gestureId) && !string.IsNullOrEmpty(inference))
+            {
+                gestureId = inference switch
+                {
+                    "0" => "IDLE",
+                    "1" => "UP",
+                    "2" => "DOWN",
+                    "3" => "LEFT",
+                    "4" => "RIGHT",
+                    "5" => "PUNCH",
+                    "6" => "WITHDRAW",
+                    "7" => "V_SHAPE",
+                    "8" => "LAMBDA_SHAPE",
+                    "9" => "TRIANGLE",
+                    "10" => "CIRCLE",
+                    "11" => "S_SHAPE",
+                    _ => "UP"
+                };
+                
+                isClenched = true;
+                confidence = 1.0f;
+            }
+        }
+
         /// <summary>Parse gestureId string to GestureType enum</summary>
         public GestureType GetGestureType()
         {
+            if (string.IsNullOrEmpty(gestureId)) return GestureType.UP;
             return gestureId.ToUpper() switch
             {
                 "UP" => GestureType.UP,
