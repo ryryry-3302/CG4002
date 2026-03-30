@@ -633,15 +633,83 @@ public class OrchestraPlacement : MonoBehaviour
         }
         planeManager.enabled = false;
         
+        // TEMPORARY: Skip calibration if MQTTManager is not available (test mode or disconnected)
+        // This prevents crashes when MQTT is not properly initialized
+        bool mqttAvailable = MQTTManager.Instance != null;
+        
+        if (!mqttAvailable)
+        {
+            Debug.Log("[OrchestraPlacement] MQTT not available - skipping calibration and proceeding to game");
+            ProceedToGameHUD();
+        }
+        // Check if this is the first launch and calibration is needed
+        else if (!PlayerPrefs.HasKey("HasCalibratedLeftGlove"))
+        {
+            Debug.Log("[OrchestraPlacement] First launch - starting calibration");
+            StartCalibrationFlow();
+        }
+        else
+        {
+            Debug.Log("[OrchestraPlacement] Already calibrated - skipping to game HUD");
+            ProceedToGameHUD();
+        }
+        
+        // Notify listeners that placements are locked
+        OnPlacementsLocked?.Invoke();
+        Debug.Log("[OrchestraPlacement] Placements locked - ready to start game");
+    }
+
+    private void StartCalibrationFlow()
+    {
+        // Ensure CalibrationController exists
+        if (CalibrationController.Instance == null)
+        {
+            GameObject calObj = new GameObject("CalibrationController");
+            calObj.AddComponent<CalibrationController>();
+            Debug.Log("[OrchestraPlacement] Created CalibrationController instance");
+        }
+
+        // Verify CalibrationController was created successfully
+        if (CalibrationController.Instance == null)
+        {
+            Debug.LogError("[OrchestraPlacement] Failed to create CalibrationController! Skipping calibration.");
+            ProceedToGameHUD();
+            return;
+        }
+
+        // Subscribe to calibration completion
+        CalibrationController.Instance.OnCalibrationComplete -= OnCalibrationComplete;
+        CalibrationController.Instance.OnCalibrationComplete += OnCalibrationComplete;
+
+        // Start calibration UI
+        CalibrationController.Instance.StartCalibration();
+    }
+
+    private void OnCalibrationComplete()
+    {
+        Debug.Log("[OrchestraPlacement] Calibration complete - saving preference");
+        
+        // Unsubscribe from event
+        if (CalibrationController.Instance != null)
+        {
+            CalibrationController.Instance.OnCalibrationComplete -= OnCalibrationComplete;
+        }
+
+        // Mark calibration as done
+        PlayerPrefs.SetInt("HasCalibratedLeftGlove", 1);
+        PlayerPrefs.Save();
+
+        // Proceed to game HUD
+        ProceedToGameHUD();
+    }
+
+    private void ProceedToGameHUD()
+    {
         // Subscribe to game events for HUD
         Invoke(nameof(SubscribeGameHUD), 0.2f);
         
         // Make characters static until a correct cue triggers their animation
         SetAllSectionAnimatorsSpeed(0f);
-        
-        // Notify listeners that placements are locked
-        OnPlacementsLocked?.Invoke();
-        Debug.Log("[OrchestraPlacement] Placements locked - ready to start game");
     }
     
     private void SubscribeGameHUD()

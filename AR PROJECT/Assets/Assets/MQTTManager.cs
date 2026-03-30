@@ -30,6 +30,8 @@ namespace OrchestraMaestro
 
         [Header("Topics")]
         [SerializeField] private string leftGestureTopic = "orchestra/left_gesture_event";
+        [SerializeField] private string leftStatusTopic = "ar/left/status";
+        [SerializeField] private string leftCommandTopic = "ar/left/cmd";
         [SerializeField] private string stickStrokeTopic = "ar/right/stick";
         [SerializeField] private string stickBpmTopic = "ar/right/bpm";
         [SerializeField] private string systemStatusTopic = "orchestra/system_status";
@@ -67,6 +69,8 @@ namespace OrchestraMaestro
         public event Action<LeftGestureEvent> OnGestureReceived;
         public event Action<float> OnDownstroke;
         public event Action<float> OnBpmReceived; // Passes the received BPM value
+        public event Action OnLeftCalibrationStarted;
+        public event Action OnLeftCalibrationComplete;
         public event Action MqttConnected;
         public event Action MqttDisconnected;
         public event Action<string> OnConnectionError;
@@ -140,6 +144,7 @@ namespace OrchestraMaestro
             List<string> topics = new List<string>
             {
                 leftGestureTopic,
+                leftStatusTopic,
                 stickStrokeTopic,
                 stickBpmTopic,
                 systemStatusTopic
@@ -148,8 +153,9 @@ namespace OrchestraMaestro
             List<byte> qosLevels = new List<byte>
             {
                 MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE,
+                MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE,
                 MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE,
-                MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE, // Changed this line previously missing a value
+                MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE,
                 MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE
             };
 
@@ -168,6 +174,7 @@ namespace OrchestraMaestro
             List<string> topics = new List<string>
             {
                 leftGestureTopic,
+                leftStatusTopic,
                 stickStrokeTopic,
                 stickBpmTopic,
                 systemStatusTopic
@@ -237,6 +244,8 @@ namespace OrchestraMaestro
 
             if (topic == leftGestureTopic)
                 HandleGestureMessage(message);
+            else if (topic == leftStatusTopic)
+                HandleLeftStatusMessage(message);
             else if (topic == stickStrokeTopic)
                 HandleStickMessage(message);
             else if (topic == stickBpmTopic)
@@ -292,6 +301,23 @@ namespace OrchestraMaestro
             Publish(rightCommandTopic, command.Trim().ToUpperInvariant());
         }
 
+        public void PublishLeftCommand(string command)
+        {
+            if (string.IsNullOrWhiteSpace(leftCommandTopic))
+            {
+                LogWarning("Cannot publish left command: leftCommandTopic is empty");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                LogWarning("Cannot publish left command: command is empty");
+                return;
+            }
+
+            Publish(leftCommandTopic, command.Trim().ToUpperInvariant());
+        }
+
         private void Publish(string topic, string payload)
         {
             if (!IsConnected)
@@ -320,6 +346,28 @@ namespace OrchestraMaestro
             catch (Exception e)
             {
                 LogWarning($"Failed to parse gesture message: {e.Message}");
+            }
+        }
+
+        private void HandleLeftStatusMessage(string message)
+        {
+            string normalized = (message ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized)) return;
+
+            Log($"Left glove status: {normalized}");
+
+            // Check for calibration-related messages
+            if (normalized.Contains("Calibration Phase", StringComparison.OrdinalIgnoreCase) ||
+                normalized.Contains("Calibrating", StringComparison.OrdinalIgnoreCase))
+            {
+                Log("Left glove calibration started");
+                OnLeftCalibrationStarted?.Invoke();
+            }
+            else if (normalized.Contains("Calibration Done", StringComparison.OrdinalIgnoreCase) ||
+                     normalized.Contains("Calibration Complete", StringComparison.OrdinalIgnoreCase))
+            {
+                Log("Left glove calibration completed");
+                OnLeftCalibrationComplete?.Invoke();
             }
         }
 
