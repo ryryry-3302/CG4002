@@ -273,18 +273,10 @@ namespace OrchestraMaestro
                 GestureType.RIGHT => "→ RIGHT",
                 GestureType.PUNCH => "👊 PUNCH",
                 GestureType.WITHDRAW => "✋ WITHDRAW",
-                GestureType.V_SHAPE => "V SHAPE",
-                GestureType.LAMBDA_SHAPE => "∧ SHAPE",
-                GestureType.TRIANGLE => "△ TRIANGLE",
-                GestureType.CIRCLE => "○ CIRCLE",
-                GestureType.S_SHAPE => "S SHAPE",
-                GestureType.HOLD => "⏸ HOLD",
-                GestureType.READY => "🎯 READY",
-                GestureType.STRONG_ACCENT => "💥 ACCENT",
-                GestureType.CLEAR_CUTOFF => "✂ CUTOFF",
-                GestureType.SUBDIVIDE => "⚡ SUBDIVIDE",
-                GestureType.BRING_OUT => "🔊 BRING OUT",
-                GestureType.TRANSITION => "➡ TRANSITION",
+                GestureType.W_SHAPE => "〰 W SHAPE",
+                GestureType.HOURGLASS_SHAPE => "⏳ HOURGLASS",
+                GestureType.LIGHTNING_BOLT_SHAPE => "⚡ LIGHTNING",
+                GestureType.TRIPLE_CLOCKWISE_CIRCLE => "⭕ CIRCLE",
                 _ => gesture.ToString()
             };
         }

@@ -186,18 +186,10 @@ namespace OrchestraMaestro
                 case GestureType.RIGHT: return "RT";
                 case GestureType.PUNCH: return "HIT";
                 case GestureType.WITHDRAW: return "OUT";
-                case GestureType.V_SHAPE: return "V";
-                case GestureType.LAMBDA_SHAPE: return "^";
-                case GestureType.TRIANGLE: return "TRI";
-                case GestureType.CIRCLE: return "O";
-                case GestureType.S_SHAPE: return "S";
-                case GestureType.HOLD: return "HOLD";
-                case GestureType.READY: return "RDY";
-                case GestureType.STRONG_ACCENT: return "!!";
-                case GestureType.CLEAR_CUTOFF: return "CUT";
-                case GestureType.SUBDIVIDE: return "DIV";
-                case GestureType.BRING_OUT: return "OUT";
-                case GestureType.TRANSITION: return "GO";
+                case GestureType.W_SHAPE: return "W";
+                case GestureType.HOURGLASS_SHAPE: return "HG";
+                case GestureType.LIGHTNING_BOLT_SHAPE: return "LB";
+                case GestureType.TRIPLE_CLOCKWISE_CIRCLE: return "TCC";
                 default: return "?";
             }
         }

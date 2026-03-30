@@ -8,34 +8,22 @@ namespace OrchestraMaestro
 {
     /// <summary>
     /// All gesture types recognized by the system.
-    /// Basic gestures (0-10): Left-hand glove only
-    /// Combo gestures (11-17): Left-hand + right-stick pattern
+    /// Gestures (0-10): Left-hand glove only
     /// </summary>
     public enum GestureType
     {
-        
-        // === Basic Left-Hand Gestures ===
+        // === Left-Hand Gestures ===
         ERROR = 0,
-        UP = 1,             // Crescendo - increase section volume
-        DOWN = 2,           // Decrescendo - decrease section volume
-        LEFT = 3,           // Section cue - switch to left section
-        RIGHT = 4,          // Section cue - switch to right section
-        PUNCH = 5,          // Accent (sforzando) - strong emphasized hit
-        WITHDRAW = 6,       // Cutoff (release) - stop sustained sound
-        V_SHAPE = 7,        // Open/broaden - fuller, louder
-        LAMBDA_SHAPE = 8,   // Close/tighten - softer, controlled
-        TRIANGLE = 9,       // Accelerando - increase tempo
-        CIRCLE = 10,        // Ritardando - decrease tempo
-        S_SHAPE = 11,       // Colour change - timbre swap
-
-        // === Combo Gestures (Left + Right Stick Pattern) ===
-        HOLD = 12,          // Fermata - freeze tempo, sustain chord
-        READY = 13,         // Prep cue - confirm devices stable
-        STRONG_ACCENT = 14, // Emphasized hit (Down-Up-Down stick pattern)
-        CLEAR_CUTOFF = 15,  // Clean stop (Down then hold stick)
-        SUBDIVIDE = 16,     // Widen timing tolerance (Down-Up-Down-Up fast)
-        BRING_OUT = 17,     // Highlight section (Up-Down-Up stick pattern)
-        TRANSITION = 18     // Advance to next phrase (Down-Up-Down-Up then hold)
+        UP = 1,                         // Crescendo - increase section volume
+        DOWN = 2,                       // Decrescendo - decrease section volume
+        LEFT = 3,                       // Section cue - switch to left section
+        RIGHT = 4,                      // Section cue - switch to right section
+        PUNCH = 5,                      // Accent - strong emphasized hit
+        WITHDRAW = 6,                   // Cutoff - stop sustained sound cleanly
+        W_SHAPE = 7,                    // Phrasing flourish - wave-like melodic passage
+        HOURGLASS_SHAPE = 8,            // Tempo reset/loop - prepare for phrase repeat
+        LIGHTNING_BOLT_SHAPE = 9,       // Subito change - sudden dramatic shift in dynamics
+        TRIPLE_CLOCKWISE_CIRCLE = 10    // Ritardando - gradual slowing over three measures
     }
 
     /// <summary>
@@ -113,11 +101,10 @@ namespace OrchestraMaestro
                     "4" => "RIGHT",
                     "5" => "PUNCH",
                     "6" => "WITHDRAW",
-                    "7" => "V_SHAPE",
-                    "8" => "LAMBDA_SHAPE",
-                    "9" => "TRIANGLE",
-                    "10" => "CIRCLE",
-                    "11" => "S_SHAPE",
+                    "7" => "W_SHAPE",
+                    "8" => "HOURGLASS_SHAPE",
+                    "9" => "LIGHTNING_BOLT_SHAPE",
+                    "10" => "TRIPLE_CLOCKWISE_CIRCLE",
                     _ => "UP"
                 };
                 
@@ -138,18 +125,10 @@ namespace OrchestraMaestro
                 "RIGHT" => GestureType.RIGHT,
                 "PUNCH" => GestureType.PUNCH,
                 "WITHDRAW" => GestureType.WITHDRAW,
-                "V_SHAPE" => GestureType.V_SHAPE,
-                "LAMBDA_SHAPE" => GestureType.LAMBDA_SHAPE,
-                "TRIANGLE" => GestureType.TRIANGLE,
-                "CIRCLE" => GestureType.CIRCLE,
-                "S_SHAPE" => GestureType.S_SHAPE,
-                "HOLD" => GestureType.HOLD,
-                "READY" => GestureType.READY,
-                "STRONG_ACCENT" => GestureType.STRONG_ACCENT,
-                "CLEAR_CUTOFF" => GestureType.CLEAR_CUTOFF,
-                "SUBDIVIDE" => GestureType.SUBDIVIDE,
-                "BRING_OUT" => GestureType.BRING_OUT,
-                "TRANSITION" => GestureType.TRANSITION,
+                "W_SHAPE" => GestureType.W_SHAPE,
+                "HOURGLASS_SHAPE" => GestureType.HOURGLASS_SHAPE,
+                "LIGHTNING_BOLT_SHAPE" => GestureType.LIGHTNING_BOLT_SHAPE,
+                "TRIPLE_CLOCKWISE_CIRCLE" => GestureType.TRIPLE_CLOCKWISE_CIRCLE,
                 _ => GestureType.UP // Default fallback
             };
         }
@@ -204,7 +183,7 @@ namespace OrchestraMaestro
         /// <summary>Check if gesture requires combo validation with stick pattern</summary>
         public static bool IsComboGesture(GestureType gesture)
         {
-            return (int)gesture >= 11; // HOLD and above are combo gestures
+            return false; // No combo gestures in new gesture set
         }
 
         /// <summary>Check if gesture affects section volume</summary>
@@ -212,22 +191,20 @@ namespace OrchestraMaestro
         {
             return gesture == GestureType.UP || 
                    gesture == GestureType.DOWN || 
-                   gesture == GestureType.V_SHAPE || 
-                   gesture == GestureType.LAMBDA_SHAPE;
+                   gesture == GestureType.W_SHAPE;
         }
 
         /// <summary>Check if gesture is a cutoff/release type</summary>
         public static bool IsCutoffGesture(GestureType gesture)
         {
-            return gesture == GestureType.WITHDRAW || gesture == GestureType.CLEAR_CUTOFF;
+            return gesture == GestureType.WITHDRAW;
         }
 
         /// <summary>Check if gesture affects tempo</summary>
         public static bool IsTempoGesture(GestureType gesture)
         {
-            return gesture == GestureType.TRIANGLE || 
-                   gesture == GestureType.CIRCLE ||
-                   gesture == GestureType.HOLD;
+            return gesture == GestureType.HOURGLASS_SHAPE || 
+                   gesture == GestureType.TRIPLE_CLOCKWISE_CIRCLE;
         }
 
         /// <summary>
@@ -237,10 +214,10 @@ namespace OrchestraMaestro
         {
             return gesture switch
             {
-                GestureType.V_SHAPE => "V",
-                GestureType.LAMBDA_SHAPE => "λ",
-                GestureType.CIRCLE => "O",
-                GestureType.S_SHAPE => "S",
+                GestureType.W_SHAPE => "W",
+                GestureType.HOURGLASS_SHAPE => "⏳",
+                GestureType.LIGHTNING_BOLT_SHAPE => "⚡",
+                GestureType.TRIPLE_CLOCKWISE_CIRCLE => "⭕",
                 _ => gesture.ToString().Replace("_", " ") // Default for others
             };
         }

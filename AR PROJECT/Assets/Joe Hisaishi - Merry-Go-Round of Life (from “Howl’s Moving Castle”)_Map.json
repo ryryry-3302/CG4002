@@ -1,6 +1,5 @@
 {
   "cues": [
-
     {
       "timestamp": 9.06,
       "gestureId": "PUNCH",
@@ -13,27 +12,27 @@
     },
     {
       "timestamp": 17.25,
-      "gestureId": "V_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "flute"
     },
     {
       "timestamp": 21.34,
-      "gestureId": "LAMBDA_SHAPE",
+      "gestureId": "DOWN",
       "section": "drum"
     },
     {
       "timestamp": 25.4,
-      "gestureId": "TRIANGLE",
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "pipe"
     },
     {
       "timestamp": 29.49,
-      "gestureId": "CIRCLE",
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "xylophone"
     },
     {
       "timestamp": 33.53,
-      "gestureId": "S_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "flute"
     },
     {
@@ -58,27 +57,27 @@
     },
     {
       "timestamp": 54.38,
-      "gestureId": "V_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "drum"
     },
     {
       "timestamp": 58.49,
-      "gestureId": "LAMBDA_SHAPE",
+      "gestureId": "DOWN",
       "section": "pipe"
     },
     {
       "timestamp": 62.53,
-      "gestureId": "TRIANGLE",
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "xylophone"
     },
     {
       "timestamp": 102.77,
-      "gestureId": "CIRCLE",
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "flute"
     },
     {
       "timestamp": 106.81,
-      "gestureId": "S_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "drum"
     },
     {
@@ -103,27 +102,27 @@
     },
     {
       "timestamp": 127.52,
-      "gestureId": "V_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "pipe"
     },
     {
       "timestamp": 131.56,
-      "gestureId": "LAMBDA_SHAPE",
+      "gestureId": "DOWN",
       "section": "xylophone"
     },
     {
       "timestamp": 135.7,
-      "gestureId": "TRIANGLE",
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "flute"
     },
     {
       "timestamp": 139.81,
-      "gestureId": "CIRCLE",
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "drum"
     },
     {
       "timestamp": 143.89,
-      "gestureId": "S_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "pipe"
     },
     {

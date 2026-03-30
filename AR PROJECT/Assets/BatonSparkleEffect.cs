@@ -467,21 +467,19 @@ public class BatonSparkleEffect : MonoBehaviour
         switch (gesture)
         {
             case GestureType.PUNCH:
-            case GestureType.STRONG_ACCENT:
                 main.startSpeed = main.startSpeed.constant * 1.5f;
                 var burst = emission.GetBurst(0);
                 emission.SetBursts(new[] { new ParticleSystem.Burst(0f, burst.count.constant + 20) });
                 break;
-            case GestureType.CIRCLE:
+            case GestureType.TRIPLE_CLOCKWISE_CIRCLE:
                 main.startLifetime = main.startLifetime.constant * 1.2f;
                 break;
             case GestureType.UP:
-            case GestureType.V_SHAPE:
+            case GestureType.W_SHAPE:
                 float spd = main.startSpeed.constant;
                 main.startSpeed = new ParticleSystem.MinMaxCurve(spd, spd * 1.3f);
                 break;
             case GestureType.WITHDRAW:
-            case GestureType.CLEAR_CUTOFF:
                 main.startSize = main.startSize.constant * 0.8f;
                 break;
         }

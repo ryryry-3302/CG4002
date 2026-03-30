@@ -129,7 +129,7 @@ namespace OrchestraMaestro
             cues.Clear();
             nextCueIndex = 0;
 
-            // Only the 3 mapped gestures
+            // Only the 3 basic action gestures
             GestureType[] gesturePool = { 
                 GestureType.UP, GestureType.DOWN, GestureType.PUNCH
             };
@@ -470,18 +470,10 @@ namespace OrchestraMaestro
                 "RIGHT" => GestureType.RIGHT,
                 "PUNCH" => GestureType.PUNCH,
                 "WITHDRAW" => GestureType.WITHDRAW,
-                "V_SHAPE" => GestureType.V_SHAPE,
-                "LAMBDA_SHAPE" => GestureType.LAMBDA_SHAPE,
-                "TRIANGLE" => GestureType.TRIANGLE,
-                "CIRCLE" => GestureType.CIRCLE,
-                "S_SHAPE" => GestureType.S_SHAPE,
-                "HOLD" => GestureType.HOLD,
-                "READY" => GestureType.READY,
-                "STRONG_ACCENT" => GestureType.STRONG_ACCENT,
-                "CLEAR_CUTOFF" => GestureType.CLEAR_CUTOFF,
-                "SUBDIVIDE" => GestureType.SUBDIVIDE,
-                "BRING_OUT" => GestureType.BRING_OUT,
-                "TRANSITION" => GestureType.TRANSITION,
+                "W_SHAPE" => GestureType.W_SHAPE,
+                "HOURGLASS_SHAPE" => GestureType.HOURGLASS_SHAPE,
+                "LIGHTNING_BOLT_SHAPE" => GestureType.LIGHTNING_BOLT_SHAPE,
+                "TRIPLE_CLOCKWISE_CIRCLE" => GestureType.TRIPLE_CLOCKWISE_CIRCLE,
                 _ => GestureType.UP
             };
         }

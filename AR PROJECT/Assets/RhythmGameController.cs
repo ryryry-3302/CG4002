@@ -439,16 +439,6 @@ namespace OrchestraMaestro
                 return; // Navigation gestures don't get scored
             }
 
-            // Handle combo gestures - validate stick pattern
-            if (GestureUtils.IsComboGesture(gesture))
-            {
-                if (!ValidateComboGesture(gesture, evt.isClenched))
-                {
-                    Debug.Log($"[RhythmGameController] Combo gesture {gesture} failed validation");
-                    return;
-                }
-            }
-
             // Judge timing against rhythm map
             ScoringResult result = rhythmMap.JudgeGesture(gesture, SelectedSection);
 
@@ -676,51 +666,6 @@ namespace OrchestraMaestro
         /// <summary>
         /// Validate that a combo gesture has the required stick pattern.
         /// </summary>
-        private bool ValidateComboGesture(GestureType gesture, bool isClenched)
-        {
-            if (!isClenched)
-            {
-                // Combo gestures require fist to be clenched
-                return false;
-            }
-
-            MQTTManager mqtt = MQTTManager.Instance;
-            if (mqtt == null) return false;
-
-            switch (gesture)
-            {
-                case GestureType.HOLD:
-                case GestureType.READY:
-                    // No strokes for 1+ beat - check if stick is still
-                    return mqtt.IsStickStill(1.0f);
-
-                case GestureType.STRONG_ACCENT:
-                    // Down-Up-Down pattern (3 strokes in quick succession)
-                    return mqtt.CountDownstrokes(comboStrokeWindow) >= 3;
-
-                case GestureType.CLEAR_CUTOFF:
-                    // One down then hold still
-                    return mqtt.CountDownstrokes(comboStrokeWindow) == 1 && 
-                           mqtt.IsStickStill(0.5f);
-
-                case GestureType.SUBDIVIDE:
-                    // Down-Up-Down-Up fast (4+ strokes)
-                    return mqtt.CountDownstrokes(comboStrokeWindow) >= 4;
-
-                case GestureType.BRING_OUT:
-                    // Up-Down-Up (3 strokes with up leading)
-                    return mqtt.CountDownstrokes(comboStrokeWindow) >= 2;
-
-                case GestureType.TRANSITION:
-                    // Down-Up-Down-Up then hold
-                    return mqtt.CountDownstrokes(comboStrokeWindow * 1.5f) >= 4 && 
-                           mqtt.IsStickStill(0.3f);
-
-                default:
-                    return true;
-            }
-        }
-
         #endregion
 
         #region BPM Preview
@@ -835,30 +780,28 @@ namespace OrchestraMaestro
             switch (gesture)
             {
                 case GestureType.UP:
-                case GestureType.V_SHAPE:
+                case GestureType.W_SHAPE:
                     // Increase volume
                     audioMixer.IncreaseSectionVolume(section);
                     break;
 
                 case GestureType.DOWN:
-                case GestureType.LAMBDA_SHAPE:
                     // Decrease volume
                     audioMixer.DecreaseSectionVolume(section);
                     break;
 
                 case GestureType.PUNCH:
-                case GestureType.STRONG_ACCENT:
                     // Accent/hit
                     audioMixer.TriggerAccent(section);
                     break;
 
                 case GestureType.WITHDRAW:
-                case GestureType.CLEAR_CUTOFF:
                     // Cutoff
                     audioMixer.TriggerCutoff(section);
                     break;
 
-                // TODO: Implement tempo and timbre effects
+                // W_SHAPE, HOURGLASS_SHAPE, LIGHTNING_BOLT_SHAPE, TRIPLE_CLOCKWISE_CIRCLE
+                // TODO: Implement additional effects for new gestures
                 default:
                     break;
             }

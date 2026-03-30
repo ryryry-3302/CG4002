@@ -16,6 +16,7 @@ public class SettingsPanelController : MonoBehaviour
     [SerializeField] private Button btnEasy;
     [SerializeField] private Button btnMedium;
     [SerializeField] private Button btnHard;
+    [SerializeField] private Button btnCalibrateGlove;
     [SerializeField] private Button btnBack;
 
     private void Awake()
@@ -37,6 +38,7 @@ public class SettingsPanelController : MonoBehaviour
         if (btnEasy != null) { btnEasy.onClick.RemoveAllListeners(); btnEasy.onClick.AddListener(() => { GameSettings.DifficultyLevel = Difficulty.Easy; UpdateDifficultyButtons(); }); }
         if (btnMedium != null) { btnMedium.onClick.RemoveAllListeners(); btnMedium.onClick.AddListener(() => { GameSettings.DifficultyLevel = Difficulty.Medium; UpdateDifficultyButtons(); }); }
         if (btnHard != null) { btnHard.onClick.RemoveAllListeners(); btnHard.onClick.AddListener(() => { GameSettings.DifficultyLevel = Difficulty.Hard; UpdateDifficultyButtons(); }); }
+        if (btnCalibrateGlove != null) { btnCalibrateGlove.onClick.RemoveAllListeners(); btnCalibrateGlove.onClick.AddListener(OnCalibrateGloveClicked); }
         if (btnBack != null) { btnBack.onClick.RemoveAllListeners(); btnBack.onClick.AddListener(OnBackClicked); }
     }
 
@@ -80,6 +82,61 @@ public class SettingsPanelController : MonoBehaviour
         SetButtonText(btnEasy, GameSettings.DifficultyLevel == Difficulty.Easy);
         SetButtonText(btnMedium, GameSettings.DifficultyLevel == Difficulty.Medium);
         SetButtonText(btnHard, GameSettings.DifficultyLevel == Difficulty.Hard);
+    }
+
+    private void OnCalibrateGloveClicked()
+    {
+        Debug.Log("[SettingsPanelController] Manual calibration requested");
+        
+        // Ensure CalibrationController exists
+        if (OrchestraMaestro.CalibrationController.Instance == null)
+        {
+            GameObject calObj = new GameObject("CalibrationController");
+            calObj.AddComponent<OrchestraMaestro.CalibrationController>();
+        }
+        
+        // Check if MQTT is available
+        if (OrchestraMaestro.MQTTManager.Instance == null)
+        {
+            Debug.LogWarning("[SettingsPanelController] Cannot calibrate - MQTT not available");
+            // TODO: Show error message to user
+            return;
+        }
+        
+        if (!OrchestraMaestro.MQTTManager.Instance.IsConnected)
+        {
+            Debug.LogWarning("[SettingsPanelController] Cannot calibrate - MQTT not connected");
+            // TODO: Show error message to user
+            return;
+        }
+        
+        // Subscribe to completion event
+        OrchestraMaestro.CalibrationController.Instance.OnCalibrationComplete -= OnManualCalibrationComplete;
+        OrchestraMaestro.CalibrationController.Instance.OnCalibrationComplete += OnManualCalibrationComplete;
+        
+        // Hide settings panel during calibration
+        Hide();
+        
+        // Start calibration
+        OrchestraMaestro.CalibrationController.Instance.StartCalibration();
+    }
+    
+    private void OnManualCalibrationComplete()
+    {
+        Debug.Log("[SettingsPanelController] Manual calibration complete");
+        
+        // Unsubscribe
+        if (OrchestraMaestro.CalibrationController.Instance != null)
+        {
+            OrchestraMaestro.CalibrationController.Instance.OnCalibrationComplete -= OnManualCalibrationComplete;
+        }
+        
+        // Save calibration status
+        PlayerPrefs.SetInt("HasCalibratedLeftGlove", 1);
+        PlayerPrefs.Save();
+        
+        // Return to settings panel
+        Show();
     }
 
     private void OnBackClicked()

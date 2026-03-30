@@ -12,27 +12,27 @@
     },
     {
       "timestamp": 17.72,
-      "gestureId": "V_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "flute"
     },
     {
       "timestamp": 21.78,
-      "gestureId": "LAMBDA_SHAPE",
+      "gestureId": "DOWN",
       "section": "drum"
     },
     {
       "timestamp": 26.38,
-      "gestureId": "TRIANGLE",
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "pipe"
     },
     {
       "timestamp": 30.7,
-      "gestureId": "CIRCLE",
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "xylophone"
     },
     {
       "timestamp": 34.97,
-      "gestureId": "S_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "flute"
     },
     {
@@ -57,27 +57,27 @@
     },
     {
       "timestamp": 55.61,
-      "gestureId": "V_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "drum"
     },
     {
       "timestamp": 59.86,
-      "gestureId": "LAMBDA_SHAPE",
+      "gestureId": "DOWN",
       "section": "pipe"
     },
     {
       "timestamp": 100.36,
-      "gestureId": "TRIANGLE",
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "xylophone"
     },
     {
       "timestamp": 104.37,
-      "gestureId": "CIRCLE",
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "flute"
     },
     {
       "timestamp": 108.62,
-      "gestureId": "S_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "drum"
     },
     {
@@ -102,27 +102,27 @@
     },
     {
       "timestamp": 129.34,
-      "gestureId": "V_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "pipe"
     },
     {
       "timestamp": 133.7,
-      "gestureId": "LAMBDA_SHAPE",
+      "gestureId": "DOWN",
       "section": "xylophone"
     },
     {
       "timestamp": 137.72,
-      "gestureId": "TRIANGLE",
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "flute"
     },
     {
       "timestamp": 141.87,
-      "gestureId": "CIRCLE",
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "drum"
     },
     {
       "timestamp": 145.89,
-      "gestureId": "S_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "pipe"
     },
     {

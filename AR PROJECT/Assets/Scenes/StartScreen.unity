@@ -733,7 +733,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5206668379868315107, guid: 817319833dd713d45af5c2121e9649c7, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -406
+      value: -416
       objectReference: {fileID: 0}
     - target: {fileID: 5206668379868315107, guid: 817319833dd713d45af5c2121e9649c7, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -5025,6 +5025,7 @@ MonoBehaviour:
   btnEasy: {fileID: 1217904974}
   btnMedium: {fileID: 207579596}
   btnHard: {fileID: 482362763}
+  btnCalibrateGlove: {fileID: 0}
   btnBack: {fileID: 245835029}
 --- !u!1 &1842570989
 GameObject:

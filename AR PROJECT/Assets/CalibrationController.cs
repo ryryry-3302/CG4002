@@ -99,19 +99,19 @@ namespace OrchestraMaestro
 
             // Instructions
             GUILayout.Label("Repeatedly open and close your\nLEFT HAND", bodyStyle);
-            GUILayout.Space(30);
-
-            // Large countdown number
-            GUILayout.Label(currentCountdown.ToString(), countdownStyle);
-            GUILayout.Space(20);
+            GUILayout.Space(40);
 
             // Progress bar
             DrawProgressBar(x, y);
 
-            GUILayout.Space(50);
+            GUILayout.Space(40);
 
             // Status text
-            GUILayout.Label("Calibrating flex sensor...", statusStyle);
+            bool testMode = MQTTManager.Instance == null || !MQTTManager.Instance.IsConnected;
+            string statusText = testMode 
+                ? "TEST MODE - UI Only (MQTT disconnected)" 
+                : "Calibrating flex sensor...";
+            GUILayout.Label(statusText, statusStyle);
 
             GUILayout.EndArea();
 
@@ -177,14 +177,13 @@ namespace OrchestraMaestro
         {
             if (MQTTManager.Instance == null)
             {
-                Debug.LogError("[CalibrationController] MQTTManager instance not found!");
+                Debug.LogWarning("[CalibrationController] MQTTManager not found - running in TEST MODE (UI only)");
                 return;
             }
 
             if (!MQTTManager.Instance.IsConnected)
             {
-                Debug.LogWarning("[CalibrationController] MQTT not connected. Cannot send CAL command.");
-                // TODO: Show error UI to user
+                Debug.LogWarning("[CalibrationController] MQTT not connected - running in TEST MODE (UI only)");
                 return;
             }
 

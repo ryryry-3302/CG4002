@@ -633,30 +633,22 @@ public class OrchestraPlacement : MonoBehaviour
         }
         planeManager.enabled = false;
         
-        // TEMPORARY: Skip calibration if MQTTManager is not available (test mode or disconnected)
-        // This prevents crashes when MQTT is not properly initialized
-        bool mqttAvailable = MQTTManager.Instance != null;
+        // Notify listeners that placements are locked
+        OnPlacementsLocked?.Invoke();
+        Debug.Log("[OrchestraPlacement] Placements locked");
         
-        if (!mqttAvailable)
-        {
-            Debug.Log("[OrchestraPlacement] MQTT not available - skipping calibration and proceeding to game");
-            ProceedToGameHUD();
-        }
         // Check if this is the first launch and calibration is needed
-        else if (!PlayerPrefs.HasKey("HasCalibratedLeftGlove"))
+        if (!PlayerPrefs.HasKey("HasCalibratedLeftGlove"))
         {
-            Debug.Log("[OrchestraPlacement] First launch - starting calibration");
+            Debug.Log("[OrchestraPlacement] First launch - starting calibration (will block game HUD)");
             StartCalibrationFlow();
+            // NOTE: ProceedToGameHUD() will be called after calibration completes
         }
         else
         {
-            Debug.Log("[OrchestraPlacement] Already calibrated - skipping to game HUD");
+            Debug.Log("[OrchestraPlacement] Already calibrated - proceeding to game HUD");
             ProceedToGameHUD();
         }
-        
-        // Notify listeners that placements are locked
-        OnPlacementsLocked?.Invoke();
-        Debug.Log("[OrchestraPlacement] Placements locked - ready to start game");
     }
 
     private void StartCalibrationFlow()
@@ -710,6 +702,47 @@ public class OrchestraPlacement : MonoBehaviour
         
         // Make characters static until a correct cue triggers their animation
         SetAllSectionAnimatorsSpeed(0f);
+    }
+    
+    /// <summary>Start manual calibration from in-game UI</summary>
+    public void StartManualCalibration()
+    {
+        Debug.Log("[OrchestraPlacement] Manual calibration requested from in-game UI");
+        
+        // Ensure CalibrationController exists
+        if (CalibrationController.Instance == null)
+        {
+            GameObject calObj = new GameObject("CalibrationController");
+            calObj.AddComponent<CalibrationController>();
+            Debug.Log("[OrchestraPlacement] Created CalibrationController instance for manual calibration");
+        }
+        
+        // Note: No MQTT check - calibration UI will run in test mode if MQTT unavailable
+        
+        // Subscribe to completion event
+        CalibrationController.Instance.OnCalibrationComplete -= OnManualCalibrationComplete;
+        CalibrationController.Instance.OnCalibrationComplete += OnManualCalibrationComplete;
+        
+        // Start calibration
+        CalibrationController.Instance.StartCalibration();
+    }
+    
+    private void OnManualCalibrationComplete()
+    {
+        Debug.Log("[OrchestraPlacement] Manual calibration complete");
+        
+        // Unsubscribe
+        if (CalibrationController.Instance != null)
+        {
+            CalibrationController.Instance.OnCalibrationComplete -= OnManualCalibrationComplete;
+        }
+        
+        // Save calibration status
+        PlayerPrefs.SetInt("HasCalibratedLeftGlove", 1);
+        PlayerPrefs.Save();
+        
+        // No need to proceed anywhere - user is already in song selection
+        Debug.Log("[OrchestraPlacement] Returning to song selection after manual calibration");
     }
     
     private void SubscribeGameHUD()
@@ -1376,23 +1409,16 @@ public class OrchestraPlacement : MonoBehaviour
         labelStyle.wordWrap = true;
         DrawOutlinedLabel(new Rect(10, 6, 220f, 44f), $"{songTitle}  {timeStr}", labelStyle, new Color(0.85f, 0.88f, 0.95f));
         
-        // ── Top-left below: BPM Info ──
         float targetBpm = ctrl?.CurrentSong != null ? ctrl.CurrentSong.bpm : 0f;
-        string bpmText = $"Target BPM: {(targetBpm > 0 ? targetBpm.ToString("F0") : "--")}\nStick BPM: {(currentStickBpm > 0 ? currentStickBpm.ToString("F0") : "--")}";
-        
-        // Change color based on if current stick BPM is close to target BPM
-        Color bpmColor = Color.white;
         float bpmDiff = targetBpm > 0 && currentStickBpm > 0 ? currentStickBpm - targetBpm : 0f; // Positive means stick is faster, Negative means stick is slower
         float absDiff = Mathf.Abs(bpmDiff);
-
+        Color bpmColor = Color.white;
         if (targetBpm > 0 && currentStickBpm > 0)
         {
             if (absDiff <= 5f) bpmColor = perfectColor;
             else if (absDiff <= 15f) bpmColor = goodColor;
             else bpmColor = missColor;
         }
-        
-        DrawOutlinedLabel(new Rect(10, 46, 220f, 44f), bpmText, labelStyle, bpmColor);
 
         float tempoStart = ctrl != null ? ctrl.TempoSectionStart : -1f;
         float tempoEnd = ctrl != null ? ctrl.TempoSectionEnd : -1f;
@@ -1516,17 +1542,6 @@ public class OrchestraPlacement : MonoBehaviour
             DrawOutlinedLabel(new Rect(scoreX, scoreY + 25, scoreW, 30), $"{finalTempoScore:F0}% - {rating}", labelStyle, ratingColor);
             
             labelStyle.fontSize = savedSize;
-        }
-
-        // ── Mobile BPM Controls (Visible for testing) ──
-        if (GUI.Button(new Rect(10, 110, 50, 25), "-5 BPM"))
-        {
-            currentStickBpm = Mathf.Max(0, currentStickBpm - 5f);
-        }
-        if (GUI.Button(new Rect(70, 110, 50, 25), "+5 BPM"))
-        {
-            if (currentStickBpm == 0) currentStickBpm = targetBpm; // Snap to target if just starting
-            else currentStickBpm += 5f;
         }
 
         labelStyle.wordWrap = false;
@@ -1728,6 +1743,13 @@ public class OrchestraPlacement : MonoBehaviour
         {
             UnlockPlacements();
         }
+        
+        GUILayout.Space(4);
+        if (GUILayout.Button("🖐 Calibrate Glove", buttonStyle))
+        {
+            StartManualCalibration();
+        }
+        
         GUILayout.EndArea();
     }
     

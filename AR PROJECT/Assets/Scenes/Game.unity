@@ -556,6 +556,8 @@ MonoBehaviour:
   localBrokerIP: 10.238.212.169
   localBrokerPort: 1883
   leftGestureTopic: orchestra/left_gesture_event
+  leftStatusTopic: ar/left/status
+  leftCommandTopic: ar/left/cmd
   stickStrokeTopic: ar/right/stick
   stickBpmTopic: ar/right/bpm
   systemStatusTopic: orchestra/system_status
@@ -590,11 +592,9 @@ MonoBehaviour:
   hudController: {fileID: 1740333156}
   currentSong: {fileID: 11400000, guid: d7f0d802cba1a91ecb3d839ca5d9e8cc, type: 2}
   availableSongs:
-  - {fileID: 11400000, guid: 5368e3fb3b6b38e46b88bd82f60ec6f8, type: 2}
-  - {fileID: 11400000, guid: 273ee136e79171a969f5886bc2ef14cf, type: 2}
-  - {fileID: 11400000, guid: 7575fce327f935d62b494f54b78afcbe, type: 2}
-  - {fileID: 11400000, guid: 070137de221c65589b96512f1ba79a22, type: 2}
   - {fileID: 11400000, guid: d7f0d802cba1a91ecb3d839ca5d9e8cc, type: 2}
+  - {fileID: 11400000, guid: 273ee136e79171a969f5886bc2ef14cf, type: 2}
+  - {fileID: 11400000, guid: 070137de221c65589b96512f1ba79a22, type: 2}
   audioSource: {fileID: 164925912}
   autoStartTestMap: 1
   comboStrokeWindow: 1

@@ -13,27 +13,27 @@
     },
     {
       "timestamp": 17.44,
-      "gestureId": "V_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "flute"
     },
     {
       "timestamp": 60.6,
-      "gestureId": "LAMBDA_SHAPE",
+      "gestureId": "DOWN",
       "section": "drum"
     },
     {
       "timestamp": 65.09,
-      "gestureId": "TRIANGLE",
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "pipe"
     },
     {
       "timestamp": 69.54,
-      "gestureId": "CIRCLE",
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "xylophone"
     },
     {
       "timestamp": 73.98,
-      "gestureId": "S_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "flute"
     }
   ],
