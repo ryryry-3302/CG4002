@@ -61,6 +61,29 @@ uint32_t lastValidStrokeMs = 0;
 const uint32_t MIN_STROKE_INTERVAL = 250;  // Ignore < 250ms (max ~240 BPM, removes bounce)
 const uint32_t MAX_STROKE_INTERVAL = 2000; // Reset > 2000ms (min ~30 BPM, handles pause/missed beat)
 
+// LED blink interval
+static const uint32_t LED_BLINK_MS = 300;
+
+// Added onboard LED lights as indicator of statuses. ADDED IN WEEK 10
+void updateStatusLed() {
+  static uint32_t lastBlinkMs = 0;
+  static bool blinkState = false;
+
+  // If connected to wifi, led stays on
+  if (WiFi.status() == WL_CONNECTED) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    return;
+  }
+
+  // If not connected to wifi but is powered on, blink
+  uint32_t now = millis();
+  if (now - lastBlinkMs >= LED_BLINK_MS) {
+    lastBlinkMs = now;
+    blinkState  = !blinkState ;
+    digitalWrite(LED_BUILTIN, blinkState ? HIGH : LOW);
+  }
+}
+
 const Step STEPS_BEAT[]      = { {true, 90},  {false, 10} };
 const Step STEPS_DOWNBEAT[]  = { {true, 110}, {false, 80}, {true, 110}, {false, 10} };
 const Step STEPS_START[]     = { {true, 90},  {false, 80}, {true, 90},  {false, 80}, {true, 90}, {false, 10} };
@@ -118,18 +141,21 @@ bool syncTime() {
   const uint32_t NTP_TIMEOUT_MS = 30000; 
   uint32_t startAttemptTime = millis();
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  Serial.print("Waiting for NTP time sync: ");
+  // Serial.print("Waiting for NTP time sync: ");
+  esp_mqtt_client_publish(client, "ar/right/status", "Waiting for NTP time sync", 0, 0, 0);
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2 && (millis() - startAttemptTime < NTP_TIMEOUT_MS)) {
     delay(500);
-    Serial.print(".");
+    // Serial.print(".");
     now = time(nullptr);
   }
   if (now < 8 * 3600 * 2) {
-    Serial.println("\n[CRITICAL] Time sync failed.");
+    // Serial.println("\n[CRITICAL] Time sync failed.");
+    esp_mqtt_client_publish(client, "ar/right/status", "Time sync failed", 0, 0, 0);
     return false;
   }
-  Serial.println("\nTime synchronized");
+  // Serial.println("\nTime synchronized");
+  esp_mqtt_client_publish(client, "ar/right/status", "Time synchronized", 0, 0, 0);
   return true;
 }
 
@@ -137,10 +163,13 @@ void handleMQTT(void *handler_args, esp_event_base_t base, int32_t event_id, voi
     auto *event = static_cast<esp_mqtt_event_handle_t>(event_data);
     switch (event_id) {
         case MQTT_EVENT_CONNECTED:
-            Serial.println("MQTT_EVENT_CONNECTED");
+            // Serial.println("MQTT_EVENT_CONNECTED");
+            esp_mqtt_client_publish(client, "ar/right/status", "MQTT Connected - Right Firebeetle", 0, 0, 0);
             mqttConnected = true;
             esp_mqtt_client_subscribe(client, "ar/right/cmd", 0);
-            esp_mqtt_client_publish(client, "ar/right/status", "esp32 online", 0, 0, 0);
+
+            // Publish online status
+            esp_mqtt_client_publish(client, "ar/right/status", "online", 0, 1, 1);
             break;
         case MQTT_EVENT_DATA: {
             String msg = String((char*)event->data).substring(0, event->data_len);
@@ -154,7 +183,8 @@ void handleMQTT(void *handler_args, esp_event_base_t base, int32_t event_id, voi
             mqttConnected = false;
             break;
         case MQTT_EVENT_ERROR:
-            Serial.println("MQTT_EVENT_ERROR");
+            // Serial.println("MQTT_EVENT_ERROR");
+            esp_mqtt_client_publish(client, "ar/right/status", "MQTT Event Error", 0, 0, 0);
             break;
         default:
             break;
@@ -164,11 +194,20 @@ void handleMQTT(void *handler_args, esp_event_base_t base, int32_t event_id, voi
 void connectWiFi() {
   WiFi.mode(WIFI_STA);
   if (!WiFi.config(local_IP, gateway, subnet, primaryDNS)) {
-    Serial.println("STA Failed to configure");
+    // Serial.println("STA Failed to configure");
+    esp_mqtt_client_publish(client, "ar/right/status", "STA Failed to configure", 0, 0, 0);
   }
   WiFi.begin(ssid, pass);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
-  Serial.println("\nWiFi OK: " + WiFi.localIP().toString());
+    while (WiFi.status() != WL_CONNECTED) {
+    updateStatusLed();
+    delay(10);
+    // Serial.print(".");
+  }
+
+  digitalWrite(LED_BUILTIN, HIGH);
+  // Serial.println("\nWiFi OK: " + WiFi.localIP().toString());
+  String ipMsg = "WiFi OK: " + WiFi.localIP().toString();
+  esp_mqtt_client_publish(client, "ar/right/status", ipMsg.c_str(), 0, 1, 1);
 }
 
 
@@ -177,6 +216,12 @@ void setupMQTTS() {
     esp_mqtt_client_config_t mqtt_cfg = {};
     mqtt_cfg.broker.address.uri = "mqtts://172.20.10.2:8883";
     mqtt_cfg.credentials.client_id = "firebeetle_right";
+
+    mqtt_cfg.session.last_will.topic = "ar/right/status";
+    mqtt_cfg.session.last_will.msg = "right-fb-offline";
+    mqtt_cfg.session.last_will.qos = 1;
+    mqtt_cfg.session.last_will.retain = true;
+
     mqtt_cfg.broker.verification.certificate = root_ca;
     mqtt_cfg.credentials.authentication.certificate = client_crt;
     mqtt_cfg.credentials.authentication.key = client_key;
@@ -305,8 +350,8 @@ void updateStickUpDown() {
           
           float avgInterval = weightedSum / weightTotal;
           float bpm = 60000.0f / avgInterval;
-          Serial.print("BPM: ");
-          Serial.println(bpm);
+          // Serial.print("BPM: ");
+          // Serial.println(bpm);
 
           if (mqttConnected) {
             time_t nowEpoch = time(nullptr);
@@ -320,12 +365,14 @@ void updateStickUpDown() {
 
     const char* label = (stickState == 1) ? "UP" : (stickState == 2) ? "NEUTRAL" : "DOWN";
     // const char* label = (stickState == 1) ? "UP" : "DOWN";
-    Serial.println(label);
+    // Serial.println(label);
     publishStickState(label);
   }
 }
 
 void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
   pinMode(25, OUTPUT);
   motorOff();
   Serial.begin(115200);
@@ -336,12 +383,16 @@ void setup() {
 
   Wire.begin();
   imu.initialize();
-  if (!imu.testConnection()) Serial.println("NO IMU detected");
-  lastImuUs = micros();
+  if (!imu.testConnection()) { 
+    // Serial.println("NO IMU detected");
+    esp_mqtt_client_publish(client, "ar/right/status", "NO IMU detected", 0, 1, 1);
+  }
+    lastImuUs = micros();
 }
 
 void loop() {
   static unsigned long lastReconnectAttempt = 0;
+  updateStatusLed();
   if (WiFi.status() != WL_CONNECTED && millis() - lastReconnectAttempt >= 5000) {
     WiFi.begin(ssid, pass);
     lastReconnectAttempt = millis();

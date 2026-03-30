@@ -61,6 +61,10 @@ namespace OrchestraMaestro
         private int goodCount = 0;
         private int missCount = 0;
 
+        // BPM Preview State
+        private bool bpmPreviewActive = false;
+        private const float BPM_PREVIEW_LEAD_TIME = 5.0f; // Start preview 5 seconds before tempo section
+
         // Events
         public event Action<GameState> OnGameStateChanged;
         public event Action<OrchestraSection> OnSectionChanged;
@@ -172,6 +176,24 @@ namespace OrchestraMaestro
         {
             if (!string.IsNullOrEmpty(TutorialWrongGestureHint) && Time.time - tutorialWrongGestureTime > 3f)
                 TutorialWrongGestureHint = null;
+
+            // BPM Preview: Vibrate at BPM for 5 seconds before tempo section starts
+            if (currentState == GameState.Playing && TempoSectionStart >= 0)
+            {
+                float currentTime = CurrentSongTime;
+                float previewStartTime = TempoSectionStart - BPM_PREVIEW_LEAD_TIME;
+                
+                // Check if we should start BPM preview
+                if (!bpmPreviewActive && currentTime >= previewStartTime && currentTime < TempoSectionStart)
+                {
+                    StartBpmPreview();
+                }
+                // Check if we should stop BPM preview (reached tempo section)
+                else if (bpmPreviewActive && currentTime >= TempoSectionStart)
+                {
+                    StopBpmPreview();
+                }
+            }
 
             // Ending SFX: play once when entering last 10 seconds
             if (currentState == GameState.Playing && !endingSfxPlayed && endingSfx != null && audioSource != null && audioSource.clip != null)
@@ -701,6 +723,38 @@ namespace OrchestraMaestro
 
         #endregion
 
+        #region BPM Preview
+
+        private void StartBpmPreview()
+        {
+            if (bpmPreviewActive) return;
+            
+            bpmPreviewActive = true;
+            
+            // Get BPM from current song
+            float bpm = currentSong != null ? currentSong.bpm : 120f;
+            
+            // Send command to ESP32 to start BPM preview with the song's BPM
+            string command = $"BPM_PREVIEW_START:{bpm:F0}";
+            MQTTManager.Instance?.PublishRightCommand(command);
+            
+            Debug.Log($"[RhythmGameController] Started BPM preview at {bpm} BPM");
+        }
+
+        private void StopBpmPreview()
+        {
+            if (!bpmPreviewActive) return;
+            
+            bpmPreviewActive = false;
+            
+            // Send command to ESP32 to stop BPM preview
+            MQTTManager.Instance?.PublishRightCommand("BPM_PREVIEW_STOP");
+            
+            Debug.Log("[RhythmGameController] Stopped BPM preview");
+        }
+
+        #endregion
+
         #region Scoring
 
         private void ProcessScoringResult(ScoringResult result, GestureType gesture)
@@ -739,7 +793,18 @@ namespace OrchestraMaestro
             OnGestureJudged?.Invoke(result);
             OnScoreChanged?.Invoke(totalScore, combo);
 
-            MQTTManager.Instance?.PublishRightCommand(result.judgement.ToString());
+            // Send haptic feedback to right stick (suppress during tempo section to avoid interfering with BPM detection)
+            bool inTempoSection = false;
+            if (TempoSectionStart >= 0 && TempoSectionEnd >= 0)
+            {
+                float currentTime = CurrentSongTime;
+                inTempoSection = currentTime >= TempoSectionStart && currentTime <= TempoSectionEnd;
+            }
+
+            if (!inTempoSection)
+            {
+                MQTTManager.Instance?.PublishRightCommand(result.judgement.ToString());
+            }
 
             // Apply audio effects
             ApplyGestureAudioEffect(gesture, result);
