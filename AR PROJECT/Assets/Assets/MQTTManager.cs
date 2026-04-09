@@ -49,6 +49,8 @@ namespace OrchestraMaestro
         [SerializeField] private string appStateTopic = "orchestra/app_state";
         [SerializeField] private string controlTopic = "/control/visualizer";
         [SerializeField] private string rightCommandTopic = "ar/right/cmd";
+        [SerializeField] private string leftGestureStartTopic = "ar/left/gesture/start";
+        [SerializeField] private string leftGestureEndTopic = "ar/left/gesture/end";
 
         [Header("Auto Reconnect")]
         [SerializeField] private bool autoReconnect = true;
@@ -85,6 +87,9 @@ namespace OrchestraMaestro
         public event Action MqttConnected;
         public event Action MqttDisconnected;
         public event Action<string> OnConnectionError;
+
+        public event Action OnLeftGestureRecordingStart;
+        public event Action OnLeftGestureRecordingEnd;
 
         // Singleton for easy access
         public static MQTTManager Instance { get; private set; }
@@ -158,7 +163,9 @@ namespace OrchestraMaestro
                 leftStatusTopic,
                 stickStrokeTopic,
                 stickBpmTopic,
-                systemStatusTopic
+                systemStatusTopic,
+                leftGestureStartTopic,
+                leftGestureEndTopic
             };
 
             List<byte> qosLevels = new List<byte>
@@ -166,6 +173,8 @@ namespace OrchestraMaestro
                 MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE,
                 MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE,
                 MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE,
+                MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE,
+                MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE,
                 MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE,
                 MqttMsgBase.QOS_LEVEL_AT_MOST_ONCE
             };
@@ -188,7 +197,9 @@ namespace OrchestraMaestro
                 leftStatusTopic,
                 stickStrokeTopic,
                 stickBpmTopic,
-                systemStatusTopic
+                systemStatusTopic,
+                leftGestureStartTopic,
+                leftGestureEndTopic
             };
 
             if (enableTestRead && !string.IsNullOrWhiteSpace(testReadTopic))
@@ -255,6 +266,14 @@ namespace OrchestraMaestro
 
             if (topic == leftGestureTopic)
                 HandleGestureMessage(message);
+            else if (topic == leftGestureStartTopic)
+            {
+                OnLeftGestureRecordingStart?.Invoke();
+            }
+            else if (topic == leftGestureEndTopic)
+            {
+                OnLeftGestureRecordingEnd?.Invoke();
+            }
             else if (topic == leftStatusTopic)
                 HandleLeftStatusMessage(message);
             else if (topic == stickStrokeTopic)
@@ -531,6 +550,18 @@ namespace OrchestraMaestro
             downstrokeBuffer.Enqueue(localTime);
             Log($"[SIMULATED] Downstroke at {localTime:F3}");
             OnDownstroke?.Invoke(localTime);
+        }
+
+        public void SimulateGestureRecordingStart()
+        {
+            Log($"[SIMULATED] Gesture Recording Started");
+            OnLeftGestureRecordingStart?.Invoke();
+        }
+
+        public void SimulateGestureRecordingEnd()
+        {
+            Log($"[SIMULATED] Gesture Recording Ended");
+            OnLeftGestureRecordingEnd?.Invoke();
         }
 
         /// <summary>Start continuously publishing "test" to testPublishTopic every testPublishInterval seconds.</summary>

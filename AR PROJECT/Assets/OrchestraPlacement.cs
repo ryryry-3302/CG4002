@@ -101,6 +101,8 @@ public class OrchestraPlacement : MonoBehaviour
     private Texture2D texSubtleBg;
     private Texture2D texSubtleHover;
     
+    private bool isRecordingGesture = false;
+
     // Singleton
     public static OrchestraPlacement Instance { get; private set; }
 
@@ -141,6 +143,8 @@ public class OrchestraPlacement : MonoBehaviour
         if (MQTTManager.Instance != null)
         {
             MQTTManager.Instance.OnBpmReceived += HandleBpmReceived;
+            MQTTManager.Instance.OnLeftGestureRecordingStart += HandleRecordingStart;
+            MQTTManager.Instance.OnLeftGestureRecordingEnd += HandleRecordingEnd;
         }
     }
 
@@ -158,6 +162,16 @@ public class OrchestraPlacement : MonoBehaviour
         currentStickBpm = bpm;
     }
 
+    private void HandleRecordingStart()
+    {
+        isRecordingGesture = true;
+    }
+
+    private void HandleRecordingEnd()
+    {
+        isRecordingGesture = false;
+    }
+
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
@@ -171,11 +185,21 @@ public class OrchestraPlacement : MonoBehaviour
         if (MQTTManager.Instance != null)
         {
             MQTTManager.Instance.OnBpmReceived -= HandleBpmReceived;
+            MQTTManager.Instance.OnLeftGestureRecordingStart -= HandleRecordingStart;
+            MQTTManager.Instance.OnLeftGestureRecordingEnd -= HandleRecordingEnd;
         }
     }
 
     void Update()
     {
+        if (Application.isEditor || GameSettings.TestMode)
+        {
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                isRecordingGesture = !isRecordingGesture;
+            }
+        }
+
         // Auto-place when GameSettings.AutoPlace and planes detected
         if (isPlacementMode && GameSettings.AutoPlace && !autoPlaceTriggered && planeManager != null && raycastManager != null)
         {
@@ -1719,6 +1743,29 @@ public class OrchestraPlacement : MonoBehaviour
             GUI.Label(new Rect((sw - 280f) / 2f, sh * 0.5f, 280f, 50f), wrongHint, labelStyle);
         }
         
+        // ── Left-center: Recording Indicator ──
+        if (isRecordingGesture)
+        {
+            float recW = 180f;
+            float recH = 30f;
+            float recX = 10f; // Left side
+            float recY = (sh - recH) / 2f; // Vertical center
+            
+            // Draw a pulsing red text
+            float pulse = Mathf.PingPong(Time.time * 4f, 1f);
+            Color recColor = new Color(1f, 0.2f, 0.2f, 0.6f + pulse * 0.4f);
+            
+            int savedSize = labelStyle.fontSize;
+            labelStyle.fontSize = 14;
+            labelStyle.fontStyle = FontStyle.Bold;
+            labelStyle.alignment = TextAnchor.MiddleLeft;
+            DrawOutlinedLabel(new Rect(recX, recY, recW, recH), "● Recording Gesture...", labelStyle, recColor);
+            
+            labelStyle.alignment = TextAnchor.UpperLeft;
+            labelStyle.fontStyle = FontStyle.Normal;
+            labelStyle.fontSize = savedSize;
+        }
+
         // ── Bottom-left: MQTT indicator + edit button ──
         bool mqttConnected = GameSettings.TestMode || (MQTTManager.Instance != null && MQTTManager.Instance.IsConnected);
         string mqttText = GameSettings.TestMode ? "MQTT: Connected (Test)" : (mqttConnected ? "MQTT: Connected" : "MQTT: Disconnected");

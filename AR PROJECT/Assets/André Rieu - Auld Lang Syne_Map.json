@@ -71,24 +71,9 @@
       "section": "drum"
     },
     {
-      "timestamp": 155.81,
-      "gestureId": "LIGHTNING_BOLT_SHAPE",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 164.0,
-      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 172.08,
-      "gestureId": "UP",
-      "section": "flute"
-    },
-    {
-      "timestamp": 180.12,
+      "timestamp": 151.81,
       "gestureId": "DOWN",
-      "section": "drum"
+      "section": "pipe"
     }
   ],
   "tempoSection": {

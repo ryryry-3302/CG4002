@@ -25,6 +25,8 @@ namespace OrchestraMaestro
         private Rect panelRect;
         private Rect toggleButtonRect;
         
+        private bool isHoldingG = false;
+
         private void Start()
         {
             // Calculate panel position
@@ -126,10 +128,23 @@ namespace OrchestraMaestro
             {
                 SimulateGesture("LEFT");
             }
-            if (GUILayout.Button("G", GUILayout.Width(buttonWidth), GUILayout.Height(buttonHeight)))
+
+            bool gPressed = GUILayout.RepeatButton("G", GUILayout.Width(buttonWidth), GUILayout.Height(buttonHeight));
+            if (Event.current.type == EventType.Repaint)
             {
-                SimulateCurrentRequestedGesture();
+                if (gPressed && !isHoldingG)
+                {
+                    isHoldingG = true;
+                    if (MQTTManager.Instance != null) MQTTManager.Instance.SimulateGestureRecordingStart();
+                }
+                else if (!gPressed && isHoldingG)
+                {
+                    isHoldingG = false;
+                    if (MQTTManager.Instance != null) MQTTManager.Instance.SimulateGestureRecordingEnd();
+                    SimulateCurrentRequestedGesture();
+                }
             }
+
             if (GUILayout.Button("→ RIGHT", GUILayout.Width(buttonWidth), GUILayout.Height(buttonHeight)))
             {
                 SimulateGesture("RIGHT");
