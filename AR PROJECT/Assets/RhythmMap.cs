@@ -12,9 +12,15 @@ namespace OrchestraMaestro
     public class RhythmMap : MonoBehaviour
     {
         [Header("Timing Windows (seconds)")]
-        [SerializeField] private float perfectWindow = 0.3f;
-        [SerializeField] private float goodWindow = 0.7f;
-        [SerializeField] private float missWindow = 1.0f;
+        [SerializeField] private float perfectWindow = 1.0f;
+
+        [Header("Difficulty Fallbacks (Overridden by code, but inspector for default)")]
+        [SerializeField] private float goodWindowLateFallback = 2.0f;
+        [SerializeField] private float goodWindowEarlyFallback = 8.0f;
+
+        // Runtime timing bounds based on difficulty
+        private float currentGoodWindowEarly;
+        private float currentGoodWindowLate;
 
         [Header("Cue Display")]
         [SerializeField] private float cueLeadTime = 0.3f; // Show cue 300ms before target
@@ -162,11 +168,36 @@ namespace OrchestraMaestro
 
         #endregion
 
+        private void UpdateDifficultyConstraints()
+        {
+            switch (GameSettings.DifficultyLevel)
+            {
+                case Difficulty.Easy:
+                    currentGoodWindowEarly = 8.0f;
+                    currentGoodWindowLate = 2.0f;
+                    break;
+                case Difficulty.Medium:
+                    currentGoodWindowEarly = 6.0f;
+                    currentGoodWindowLate = 2.0f;
+                    break;
+                case Difficulty.Hard:
+                    currentGoodWindowEarly = 4.0f;
+                    currentGoodWindowLate = 2.0f;
+                    break;
+                default:
+                    currentGoodWindowEarly = goodWindowEarlyFallback;
+                    currentGoodWindowLate = goodWindowLateFallback;
+                    break;
+            }
+            Debug.Log($"[RhythmMap] Difficulty: {GameSettings.DifficultyLevel} | Early: {currentGoodWindowEarly} | Late: {currentGoodWindowLate}");
+        }
+
         #region Playback Control
 
         /// <summary>Start the rhythm map playback, synced to audio clock</summary>
         public void StartPlayback()
         {
+            UpdateDifficultyConstraints();
             songStartDspTime = AudioSettings.dspTime;
             nextCueIndex = 0;
             isPlaying = true;
@@ -281,10 +312,10 @@ namespace OrchestraMaestro
                 float timeUntilCue = cue.timestamp - currentTime;
 
                 // Cheats: auto-perfect at exact beat (timeUntilCue <= 0)
-                // Regular: miss when cue passed miss window (timeUntilCue < -missWindow)
+                // Regular: miss when cue passed currentGoodWindowLate (timeUntilCue < -currentGoodWindowLate)
                 bool shouldConsume = GameSettings.CurrentMode == GameMode.Cheats
                     ? (timeUntilCue <= 0 && !cue.consumed)
-                    : (timeUntilCue < -missWindow && !cue.consumed);
+                    : (timeUntilCue < -currentGoodWindowLate && !cue.consumed);
 
                 if (shouldConsume)
                 {
@@ -393,20 +424,23 @@ namespace OrchestraMaestro
                 primaryGesture = candidateGestures[0];
             }
 
-            // Find the closest matching cue within the timing window
+            // Find the active cue within the timing window, preferring chronologically oldest (FIFO)
             for (int i = nextCueIndex; i < cues.Count; i++)
             {
                 var cue = cues[i];
                 if (cue.consumed) continue;
 
                 float offset = currentTime - cue.timestamp;
-                float cueAbsOffset = Mathf.Abs(offset);
 
-                // Check if within miss window
-                if (cueAbsOffset > missWindow) 
+                // Check if within widest valid window (Good window)
+                if (offset > currentGoodWindowLate) 
                 {
-                    if (offset < -missWindow) break; // Future cues, stop searching
-                    continue; // Past cues beyond window
+                    continue; // Past cue beyond late window (should be handled by miss logic, but check anyway)
+                }
+
+                if (offset < -currentGoodWindowEarly) 
+                {
+                    break; // Future cues beyond early window. Since cues are chronological, stop searching
                 }
 
                 // Check gesture type match against any candidate
@@ -416,15 +450,12 @@ namespace OrchestraMaestro
                 // Check section match (if cue specifies a section)
                 if (cue.targetSection.HasValue && cue.targetSection.Value != currentSection) continue;
 
-                // Found a valid match - check if it's the best
-                if (cueAbsOffset < Mathf.Abs(bestOffset) ||
-                    (Mathf.Approximately(cueAbsOffset, Mathf.Abs(bestOffset)) && rank < bestRank))
-                {
-                    bestMatch = cue;
-                    bestOffset = offset;
-                    bestRank = rank;
-                    matchedGesture = cue.gestureType;
-                }
+                // Found the oldest valid match - pick it immediately to resolve overlapping ambiguities
+                bestMatch = cue;
+                bestOffset = offset;
+                bestRank = rank;
+                matchedGesture = cue.gestureType;
+                break;
             }
 
             // No valid match found
@@ -456,13 +487,12 @@ namespace OrchestraMaestro
                 }
             }
 
-            // Determine judgement tier
-            float finalAbsOffset = Mathf.Abs(bestOffset);
+            // Determine judgement tier based on asymmetrical bounds
             JudgementType judgement;
             
-            if (finalAbsOffset <= perfectWindow)
+            if (bestOffset >= -perfectWindow && bestOffset <= perfectWindow)
                 judgement = JudgementType.Perfect;
-            else if (finalAbsOffset <= goodWindow)
+            else if (bestOffset >= -currentGoodWindowEarly && bestOffset <= currentGoodWindowLate)
                 judgement = JudgementType.Good;
             else
                 judgement = JudgementType.Miss;
