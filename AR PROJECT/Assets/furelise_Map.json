@@ -1,44 +1,36 @@
 {
   "cues": [
-
     {
-      "timestamp": 9.01,
-      "gestureId": "PUNCH",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 13.24,
-      "gestureId": "WITHDRAW",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 17.44,
-      "gestureId": "W_SHAPE",
+      "timestamp": 5.06,
+      "gestureId": "UP",
       "section": "flute"
     },
     {
-      "timestamp": 60.6,
+      "timestamp": 13.24,
       "gestureId": "DOWN",
       "section": "drum"
     },
     {
-      "timestamp": 65.09,
-      "gestureId": "LIGHTNING_BOLT_SHAPE",
+      "timestamp": 60.6,
+      "gestureId": "PUNCH",
       "section": "pipe"
     },
     {
-      "timestamp": 69.54,
-      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
+      "timestamp": 69.06,
+      "gestureId": "WITHDRAW",
       "section": "xylophone"
-    },
-    {
-      "timestamp": 73.98,
-      "gestureId": "HOURGLASS_SHAPE",
-      "section": "flute"
     }
   ],
   "tempoSection": {
     "start": 25.53,
     "end": 55.53
+  },
+  "tempoBpm": 123.047,
+  "detectedTempoBpm": 123.047,
+  "suggestedSongOffset": 0.557,
+  "generationConfig": {
+    "minInterval": 8.0,
+    "introNoCueSeconds": 5.0,
+    "bpmOverride": null
   }
 }

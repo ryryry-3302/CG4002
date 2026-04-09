@@ -4,8 +4,9 @@ import numpy as np
 import json
 import sys
 import os
+import argparse
 
-def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
+def generate_rhythm_map(audio_file, output_file, min_interval=4.0, intro_no_cue_seconds=5.0, bpm_override=None):
     """
     Generates a rhythm map JSON from an audio file using beat detection.
     Cues are placed on actual detected beat positions from the audio,
@@ -15,6 +16,7 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
         audio_file (str): Path to input audio file.
         output_file (str): Path to output JSON file.
         min_interval (float): Minimum time in seconds between cues.
+        intro_no_cue_seconds (float): Prevent cues from being generated in the first N seconds.
     """
     print(f"Loading {audio_file}...")
     try:
@@ -37,6 +39,11 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
     else:
         tempo = float(tempo)
 
+    detected_tempo = tempo
+    if bpm_override is not None:
+        tempo = float(bpm_override)
+        print(f"Using BPM override: {tempo:.2f} BPM (detected {detected_tempo:.2f} BPM)")
+
     print(f"Detected Tempo: {tempo:.2f} BPM")
     print(f"Beat interval: {60.0/tempo:.3f} seconds")
     print(f"Total beats detected: {len(beat_times)}")
@@ -45,6 +52,13 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
     onset_frames = librosa.onset.onset_detect(y=y, sr=sr)
     onset_times = librosa.frames_to_time(onset_frames, sr=sr)
     print(f"Total onsets detected: {len(onset_times)}")
+
+    offset_candidates = []
+    if len(beat_times) > 0:
+        offset_candidates.append(float(beat_times[0]))
+    if len(onset_times) > 0:
+        offset_candidates.append(float(onset_times[0]))
+    suggested_song_offset = min(offset_candidates) if offset_candidates else 0.0
 
     # Merge beats and onsets, sort, and deduplicate (within 0.1s)
     all_times = np.sort(np.concatenate([beat_times, onset_times]))
@@ -67,7 +81,16 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
 
     # Sections and gestures to cycle through
     sections = ["flute", "drum", "pipe", "xylophone"]
-    gestures = ["UP", "DOWN", "PUNCH", "WITHDRAW", "V_SHAPE", "LAMBDA_SHAPE", "TRIANGLE", "CIRCLE", "S_SHAPE"]
+    gestures = [
+        "UP",
+        "DOWN",
+        "PUNCH",
+        "WITHDRAW",
+        "W_SHAPE",
+        "HOURGLASS_SHAPE",
+        "LIGHTNING_BOLT_SHAPE",
+        "TRIPLE_CLOCKWISE_CIRCLE"
+    ]
 
     cues = []
     
@@ -78,6 +101,10 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
     gesture_index = 0
 
     for t in filtered_times:
+        # No cues in the first intro window
+        if t < intro_no_cue_seconds:
+            continue
+
         # Skip cues that fall into the restricted zone
         if t >= no_cue_start and t <= no_cue_end:
             continue
@@ -95,26 +122,49 @@ def generate_rhythm_map(audio_file, output_file, min_interval=4.0):
             gesture_index += 1
 
     # Wrap in root object
-    data = {"cues": cues, "tempoSection": {"start": round(tempo_start, 2), "end": round(tempo_end, 2)}}
+    data = {
+        "cues": cues,
+        "tempoSection": {"start": round(tempo_start, 2), "end": round(tempo_end, 2)},
+        "tempoBpm": round(float(tempo), 3),
+        "detectedTempoBpm": round(float(detected_tempo), 3),
+        "suggestedSongOffset": round(suggested_song_offset, 3),
+        "generationConfig": {
+            "minInterval": min_interval,
+            "introNoCueSeconds": intro_no_cue_seconds,
+            "bpmOverride": bpm_override
+        }
+    }
 
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=2)
 
     print(f"\nGenerated {len(cues)} cues to {output_file}")
-    print(f"First cue at: {cues[0]['timestamp']}s")
-    print(f"Last cue at: {cues[-1]['timestamp']}s")
+    if cues:
+        print(f"First cue at: {cues[0]['timestamp']}s")
+        print(f"Last cue at: {cues[-1]['timestamp']}s")
+    else:
+        print("No cues generated. Try lowering min_interval.")
+
+    print(f"Recommended SongData.offset: {suggested_song_offset:.3f}s")
+    print("Apply this in the SongData asset 'offset' field for beat alignment.")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python GenerateRhythmMap.py <audio_file> [output_file]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Generate rhythm map JSON from an audio file")
+    parser.add_argument("audio_file", help="Path to input audio file")
+    parser.add_argument("output_file", nargs="?", help="Path to output JSON file")
+    parser.add_argument("--bpm", type=float, default=None, help="Optional BPM override")
+    parser.add_argument("--min-interval", type=float, default=4.0, help="Minimum seconds between cues")
+    args = parser.parse_args()
 
-    input_audio = sys.argv[1]
-    if len(sys.argv) >= 3:
-        output_json = sys.argv[2]
-    else:
+    input_audio = args.audio_file
+    output_json = args.output_file
+    if output_json is None:
         base, _ = os.path.splitext(input_audio)
         output_json = base + "_Map.json"
 
-    generate_rhythm_map(input_audio, output_json, min_interval=4.0)
-
+    generate_rhythm_map(
+        input_audio,
+        output_json,
+        min_interval=args.min_interval,
+        bpm_override=args.bpm
+    )

@@ -1,143 +1,91 @@
 {
   "cues": [
     {
-      "timestamp": 9.06,
+      "timestamp": 5.18,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 13.49,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 21.71,
       "gestureId": "PUNCH",
       "section": "pipe"
     },
     {
-      "timestamp": 13.17,
+      "timestamp": 29.72,
       "gestureId": "WITHDRAW",
       "section": "xylophone"
     },
     {
-      "timestamp": 17.25,
+      "timestamp": 37.87,
       "gestureId": "W_SHAPE",
       "section": "flute"
-    },
-    {
-      "timestamp": 21.34,
-      "gestureId": "DOWN",
-      "section": "drum"
-    },
-    {
-      "timestamp": 25.4,
-      "gestureId": "LIGHTNING_BOLT_SHAPE",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 29.49,
-      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 33.53,
-      "gestureId": "HOURGLASS_SHAPE",
-      "section": "flute"
-    },
-    {
-      "timestamp": 37.55,
-      "gestureId": "UP",
-      "section": "drum"
-    },
-    {
-      "timestamp": 41.87,
-      "gestureId": "DOWN",
-      "section": "pipe"
     },
     {
       "timestamp": 45.98,
-      "gestureId": "PUNCH",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 50.2,
-      "gestureId": "WITHDRAW",
-      "section": "flute"
-    },
-    {
-      "timestamp": 54.38,
-      "gestureId": "W_SHAPE",
+      "gestureId": "HOURGLASS_SHAPE",
       "section": "drum"
     },
     {
-      "timestamp": 58.49,
-      "gestureId": "DOWN",
+      "timestamp": 54.01,
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "pipe"
     },
     {
-      "timestamp": 62.53,
-      "gestureId": "LIGHTNING_BOLT_SHAPE",
+      "timestamp": 62.18,
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "xylophone"
     },
     {
       "timestamp": 102.77,
-      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
+      "gestureId": "UP",
       "section": "flute"
     },
     {
-      "timestamp": 106.81,
-      "gestureId": "HOURGLASS_SHAPE",
-      "section": "drum"
-    },
-    {
       "timestamp": 110.99,
-      "gestureId": "UP",
-      "section": "pipe"
-    },
-    {
-      "timestamp": 115.29,
       "gestureId": "DOWN",
-      "section": "xylophone"
+      "section": "drum"
     },
     {
       "timestamp": 119.33,
       "gestureId": "PUNCH",
-      "section": "flute"
-    },
-    {
-      "timestamp": 123.41,
-      "gestureId": "WITHDRAW",
-      "section": "drum"
-    },
-    {
-      "timestamp": 127.52,
-      "gestureId": "W_SHAPE",
       "section": "pipe"
     },
     {
-      "timestamp": 131.56,
-      "gestureId": "DOWN",
+      "timestamp": 127.52,
+      "gestureId": "WITHDRAW",
       "section": "xylophone"
     },
     {
       "timestamp": 135.7,
-      "gestureId": "LIGHTNING_BOLT_SHAPE",
+      "gestureId": "W_SHAPE",
       "section": "flute"
-    },
-    {
-      "timestamp": 139.81,
-      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
-      "section": "drum"
     },
     {
       "timestamp": 143.89,
       "gestureId": "HOURGLASS_SHAPE",
+      "section": "drum"
+    },
+    {
+      "timestamp": 151.97,
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
       "section": "pipe"
-    },
-    {
-      "timestamp": 148.21,
-      "gestureId": "UP",
-      "section": "xylophone"
-    },
-    {
-      "timestamp": 152.32,
-      "gestureId": "DOWN",
-      "section": "flute"
     }
   ],
   "tempoSection": {
     "start": 67.77,
     "end": 97.77
+  },
+  "tempoBpm": 172.266,
+  "detectedTempoBpm": 172.266,
+  "suggestedSongOffset": 0.697,
+  "generationConfig": {
+    "minInterval": 8.0,
+    "introNoCueSeconds": 5.0,
+    "bpmOverride": null
   }
 }

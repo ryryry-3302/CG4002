@@ -59,10 +59,13 @@ namespace OrchestraMaestro
                     {
                         GestureType.UP => "↑ UP",
                         GestureType.DOWN => "↓ DOWN",
-                        GestureType.LEFT => "← LEFT",
-                        GestureType.RIGHT => "→ RIGHT",
                         GestureType.PUNCH => "👊 PUNCH",
-                        _ => cue.gestureType.ToString()
+                        GestureType.WITHDRAW => "👊 WITHDRAW",
+                        GestureType.W_SHAPE => "W",
+                        GestureType.HOURGLASS_SHAPE => "HOURGLASS",
+                        GestureType.LIGHTNING_BOLT_SHAPE => "LIGHTNING",
+                        GestureType.TRIPLE_CLOCKWISE_CIRCLE => "3x CLOCKWISE",
+                        _ => cue.gestureType.ToString().Replace("_SHAPE", "").Replace("_", " ")
                     };
                     
                     // Get timing color from the active radar
@@ -74,6 +77,25 @@ namespace OrchestraMaestro
                 }
             }
             return (null, null, Color.white);
+        }
+
+        /// <summary>
+        /// Try to get the gesture type of the currently active requested cue.
+        /// Returns true when a cue is active, false otherwise.
+        /// </summary>
+        public bool TryGetCurrentActiveGestureType(out GestureType gestureType)
+        {
+            for (int i = 0; i < activeCues.Length; i++)
+            {
+                if (activeCues[i].HasValue)
+                {
+                    gestureType = activeCues[i].Value.gestureType;
+                    return true;
+                }
+            }
+
+            gestureType = GestureType.ERROR;
+            return false;
         }
         
         /// <summary>Get timing progress of the nearest active cue (0 = just appeared, 1 = hit time, >1 = past due). Returns -1 if no active cue.</summary>
@@ -133,9 +155,9 @@ namespace OrchestraMaestro
 
             cueLeadTime = GameSettings.DifficultyLevel switch
             {
-                Difficulty.Easy => 4f,
-                Difficulty.Hard => 2f,
-                _ => 3f
+                Difficulty.Easy => 8f,
+                Difficulty.Hard => 4f,
+                _ => 6f
             };
 
             // Unsubscribe from any old (potentially destroyed) objects first, then subscribe fresh
@@ -175,6 +197,12 @@ namespace OrchestraMaestro
                 // Debug.Log("[CueRadarManager] Game is playing - spawning radars now");
                 SpawnRadars();
                 radarsSpawned = true;
+            }
+
+            if (ShouldSuppressRadarCues())
+            {
+                HideAndClearAllRadars();
+                return;
             }
             
             // Only process cues if game is playing
@@ -358,6 +386,7 @@ namespace OrchestraMaestro
                 outerRingObj.transform.SetParent(canvasRect, false);
                 UnityEngine.UI.Image outerRing = outerRingObj.AddComponent<UnityEngine.UI.Image>();
                 outerRing.color = Color.white;
+                outerRing.enabled = false; // Hide old target
                 RectTransform outerRect = outerRingObj.GetComponent<RectTransform>();
                 outerRect.sizeDelta = new Vector2(180, 180);
                 outerRect.anchoredPosition = Vector2.zero;
@@ -367,6 +396,7 @@ namespace OrchestraMaestro
                 innerCircleObj.transform.SetParent(canvasRect, false);
                 UnityEngine.UI.Image innerCircle = innerCircleObj.AddComponent<UnityEngine.UI.Image>();
                 innerCircle.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+                innerCircle.enabled = false; // Hide old target
                 RectTransform innerRect = innerCircleObj.GetComponent<RectTransform>();
                 innerRect.sizeDelta = new Vector2(140, 140);
                 innerRect.anchoredPosition = Vector2.zero;
@@ -439,6 +469,13 @@ namespace OrchestraMaestro
                 // Skip section navigation cues
                 if (!cue.targetSection.HasValue) continue;
                 if (cue.consumed) continue;
+
+                // Tutorial: LEFT/RIGHT are navigation training gestures, not countdown radar cues.
+                if (GameSettings.CurrentMode == GameMode.Tutorial &&
+                    (cue.gestureType == GestureType.LEFT || cue.gestureType == GestureType.RIGHT))
+                {
+                    continue;
+                }
                 
                 // Generate hash to avoid duplicates
                 int hash = GetCueHash(cue);
@@ -448,14 +485,68 @@ namespace OrchestraMaestro
                 int sectionIndex = (int)cue.targetSection.Value;
                 cueQueues[sectionIndex].Enqueue(cue);
                 queuedCueHashes.Add(hash);
-                
+
                 // Debug.Log($"[CueRadarManager] Queued cue: {cue.gestureType} for {cue.targetSection}");
-                
-                // If no active cue for this section, show it
-                if (!activeCues[sectionIndex].HasValue)
+            }
+
+            // Keep only one globally active cue at a time (prevents multi-cue clutter on large lead times).
+            if (!HasAnyActiveCue())
+            {
+                ShowEarliestQueuedCue();
+            }
+        }
+
+        private bool ShouldSuppressRadarCues()
+        {
+            if (GameSettings.CurrentMode != GameMode.Tutorial) return false;
+            if (RhythmGameController.Instance == null) return false;
+            return RhythmGameController.Instance.IsGuidedTutorialActive;
+        }
+
+        private void HideAndClearAllRadars()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                cueQueues[i].Clear();
+                activeCues[i] = null;
+
+                if (radars[i] != null)
+                    radars[i].Hide();
+                if (radars3D[i] != null)
+                    radars3D[i].Hide();
+            }
+
+            queuedCueHashes.Clear();
+        }
+
+        private bool HasAnyActiveCue()
+        {
+            for (int i = 0; i < activeCues.Length; i++)
+            {
+                if (activeCues[i].HasValue) return true;
+            }
+            return false;
+        }
+
+        private void ShowEarliestQueuedCue()
+        {
+            int bestSection = -1;
+            float bestTimestamp = float.MaxValue;
+
+            for (int i = 0; i < cueQueues.Length; i++)
+            {
+                if (cueQueues[i].Count == 0) continue;
+                RhythmCue candidate = cueQueues[i].Peek();
+                if (candidate.timestamp < bestTimestamp)
                 {
-                    ShowNextCue(sectionIndex);
+                    bestTimestamp = candidate.timestamp;
+                    bestSection = i;
                 }
+            }
+
+            if (bestSection >= 0)
+            {
+                ShowNextCue(bestSection);
             }
         }
 
@@ -606,7 +697,19 @@ namespace OrchestraMaestro
         private System.Collections.IEnumerator ShowNextCueDelayed(int sectionIndex, float delay)
         {
             yield return new WaitForSeconds(delay);
-            ShowNextCue(sectionIndex);
+
+            activeCues[sectionIndex] = null;
+
+            if (radars[sectionIndex] != null)
+            {
+                radars[sectionIndex].Hide();
+            }
+            if (radars3D[sectionIndex] != null)
+            {
+                radars3D[sectionIndex].Hide();
+            }
+
+            ShowEarliestQueuedCue();
         }
 
         #endregion
@@ -676,6 +779,54 @@ namespace OrchestraMaestro
             {
                 UpdateRadarPosition(i);
             }
+        }
+
+        /// <summary>
+        /// Returns the section index for the highest priority cue requiring attention.
+        /// Prefers currently active cues (visualized on radar). Falls back to the earliest queued cue.
+        /// Returns null if no cues have an assigned section.
+        /// </summary>
+        public OrchestraSection? GetNextTargetSection()
+        {
+            // First pass: any active cue already shown on a radar is the most urgent.
+            float soonestTime = float.MaxValue;
+            int? bestSectionIndex = null;
+
+            for (int i = 0; i < activeCues.Length; i++)
+            {
+                if (!activeCues[i].HasValue) continue;
+
+                float remaining = activeCues[i].Value.timestamp - (float)(rhythmMap?.CurrentSongTime ?? 0f);
+                if (remaining < soonestTime)
+                {
+                    soonestTime = remaining;
+                    bestSectionIndex = i;
+                }
+            }
+
+            if (bestSectionIndex.HasValue)
+            {
+                return (OrchestraSection)bestSectionIndex.Value;
+            }
+
+            // Second pass: peek earliest queued cue (not yet active) by timestamp.
+            RhythmCue? bestQueuedCue = null;
+            for (int i = 0; i < cueQueues.Length; i++)
+            {
+                if (cueQueues[i].Count == 0) continue;
+                RhythmCue candidate = cueQueues[i].Peek();
+                if (!bestQueuedCue.HasValue || candidate.timestamp < bestQueuedCue.Value.timestamp)
+                {
+                    bestQueuedCue = candidate;
+                }
+            }
+
+            if (bestQueuedCue.HasValue && bestQueuedCue.Value.targetSection.HasValue)
+            {
+                return bestQueuedCue.Value.targetSection.Value;
+            }
+
+            return null;
         }
 
         #endregion

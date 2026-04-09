@@ -23,6 +23,17 @@ namespace OrchestraMaestro
     /// </summary>
     public class MQTTManager : M2MqttUnity.M2MqttUnityClient
     {
+        [Serializable]
+        private struct LeftGestureMessagePayload
+        {
+            public string gestureId;
+            public string inference;
+            public bool isClenched;
+            public long timestamp;
+            public float confidence;
+            public string[] top3_labels;
+        }
+
         [Header("Local Testing")]
         [SerializeField] private bool useLocalTesting = false;
         [SerializeField] private string localBrokerIP = "192.168.1.100";
@@ -337,7 +348,16 @@ namespace OrchestraMaestro
         {
             try
             {
-                LeftGestureEvent evt = JsonUtility.FromJson<LeftGestureEvent>(json);
+                LeftGestureMessagePayload payload = JsonUtility.FromJson<LeftGestureMessagePayload>(json);
+                LeftGestureEvent evt = new LeftGestureEvent
+                {
+                    gestureId = payload.gestureId,
+                    inference = payload.inference,
+                    isClenched = payload.isClenched,
+                    timestamp = payload.timestamp,
+                    confidence = payload.confidence
+                };
+                evt.SetTop3Labels(payload.top3_labels);
                 evt.Normalize();
                 
                 Log($"Gesture received: {evt.gestureId} (clenched: {evt.isClenched})");

@@ -1,0 +1,14 @@
+{
+  "cues": [
+    { "timestamp": 5.0, "gestureId": "LEFT", "section": "flute" },
+    { "timestamp": 10.0, "gestureId": "RIGHT", "section": "drum" },
+    { "timestamp": 15.0, "gestureId": "UP", "section": "xylophone" },
+    { "timestamp": 20.0, "gestureId": "DOWN", "section": "pipe" },
+    { "timestamp": 25.0, "gestureId": "PUNCH", "section": "flute" },
+    { "timestamp": 30.0, "gestureId": "WITHDRAW", "section": "drum" },
+    { "timestamp": 35.0, "gestureId": "W_SHAPE", "section": "xylophone" },
+    { "timestamp": 40.0, "gestureId": "HOURGLASS_SHAPE", "section": "pipe" },
+    { "timestamp": 45.0, "gestureId": "LIGHTNING_BOLT_SHAPE", "section": "flute" },
+    { "timestamp": 50.0, "gestureId": "TRIPLE_CLOCKWISE_CIRCLE", "section": "drum" }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "cues": [
+    {
+      "timestamp": 5.55,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 13.7,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 22.01,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 30.35,
+      "gestureId": "WITHDRAW",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 38.68,
+      "gestureId": "W_SHAPE",
+      "section": "flute"
+    },
+    {
+      "timestamp": 46.72,
+      "gestureId": "HOURGLASS_SHAPE",
+      "section": "drum"
+    },
+    {
+      "timestamp": 55.31,
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 63.83,
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 72.28,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 114.57,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 122.65,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 130.96,
+      "gestureId": "WITHDRAW",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 139.3,
+      "gestureId": "W_SHAPE",
+      "section": "flute"
+    },
+    {
+      "timestamp": 147.63,
+      "gestureId": "HOURGLASS_SHAPE",
+      "section": "drum"
+    },
+    {
+      "timestamp": 155.81,
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 164.0,
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 172.08,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 180.12,
+      "gestureId": "DOWN",
+      "section": "drum"
+    }
+  ],
+  "tempoSection": {
+    "start": 79.48,
+    "end": 109.48
+  },
+  "tempoBpm": 82.0,
+  "detectedTempoBpm": 95.703,
+  "suggestedSongOffset": 0.093,
+  "generationConfig": {
+    "minInterval": 8.0,
+    "introNoCueSeconds": 5.0,
+    "bpmOverride": 82.0
+  }
+}

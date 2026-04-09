@@ -58,6 +58,7 @@ namespace OrchestraMaestro
             Renderer bgRenderer = bgObj.GetComponent<Renderer>();
             bgRenderer.material = new Material(Shader.Find("Sprites/Default"));
             bgRenderer.material.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+            bgRenderer.enabled = false; // Hide old target quad
             backgroundSprite = null; // Using renderer directly
             
             // Create ring quad (slightly in front)
@@ -71,6 +72,7 @@ namespace OrchestraMaestro
             Renderer ringRenderer = ringObj.GetComponent<Renderer>();
             ringRenderer.material = new Material(Shader.Find("Sprites/Default"));
             ringRenderer.material.color = Color.red;
+            ringRenderer.enabled = false; // Hide old target quad
             
             // Store ring reference for animation
             ringTransform = ringObj.transform;

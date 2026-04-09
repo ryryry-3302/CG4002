@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4670f837dfb59383fac74e7b4c378306, type: 3}
+  m_Name: AuldLangSyne
+  m_EditorClassIdentifier: 
+  songName: Auld Lang Syne
+  artistName: "Andr\xE9 Rieu"
+  audioClip: {fileID: 8300000, guid: d763bcbf600546357b075b88c7fff98f, type: 3}
+  bpm: 82
+  offset: 0.093
+  rhythmMapJson: {fileID: 4900000, guid: 446855e161b478c7bb819eb470fad537, type: 3}

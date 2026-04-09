@@ -595,6 +595,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d7f0d802cba1a91ecb3d839ca5d9e8cc, type: 2}
   - {fileID: 11400000, guid: 273ee136e79171a969f5886bc2ef14cf, type: 2}
   - {fileID: 11400000, guid: 070137de221c65589b96512f1ba79a22, type: 2}
+  - {fileID: 11400000, guid: edca83dfc3b096d7082b2d5d3ce1cd86, type: 2}
+  - {fileID: 11400000, guid: bdbe5b0864d94def9913238525bc471e, type: 2}
   audioSource: {fileID: 164925912}
   autoStartTestMap: 1
   comboStrokeWindow: 1

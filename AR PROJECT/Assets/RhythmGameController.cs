@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace OrchestraMaestro
@@ -42,6 +43,8 @@ namespace OrchestraMaestro
         [Header("Ambience & Ending")]
         [Tooltip("Plays once when the game/song starts.")]
         [SerializeField] private AudioClip ambienceSfx;
+        [Tooltip("Optional background music for the tutorial mode.")]
+        [SerializeField] private AudioClip tutorialBgm;
         [Tooltip("Plays once when entering the last 10 seconds of the song.")]
         [SerializeField] private AudioClip endingSfx;
 
@@ -87,6 +90,23 @@ namespace OrchestraMaestro
         public string TutorialWrongGestureHint { get; private set; }
         /// <summary>Tutorial: whether playback is paused waiting for user gesture.</summary>
         public bool IsTutorialPaused => rhythmMap != null && rhythmMap.IsPausedForTutorial;
+        public bool IsGuidedTutorialActive => tutorialNavigationTrainingActive || tutorialGestureTrainingActive;
+        public bool IsTutorialMode => GameSettings.CurrentMode == GameMode.Tutorial;
+        public bool TutorialGestureTrainingActive => tutorialGestureTrainingActive;
+
+        public bool TryGetGuidedTutorialCue(out GestureType gesture, out OrchestraSection targetSection)
+        {
+            if (tutorialGestureTrainingActive && tutorialWaitingForTryItOutInput && tutorialExpectedGesture != GestureType.ERROR)
+            {
+                gesture = tutorialExpectedGesture;
+                targetSection = tutorialExpectedSection;
+                return true;
+            }
+
+            gesture = GestureType.ERROR;
+            targetSection = OrchestraSection.Drum;
+            return false;
+        }
 
         /// <summary>Current playback time in seconds. 0 if no map.</summary>
         public float CurrentSongTime => rhythmMap != null ? rhythmMap.CurrentSongTime : 0f;
@@ -95,6 +115,26 @@ namespace OrchestraMaestro
         public float TempoSectionEnd => rhythmMap != null ? rhythmMap.TempoSectionEnd : -1f;
         private float tutorialWrongGestureTime;
         private bool endingSfxPlayed;
+        private bool tutorialNavigationTrainingActive;
+        private bool tutorialLeftNavigationCompleted;
+        private bool tutorialRightNavigationCompleted;
+        private GestureType tutorialExpectedNavigationGesture = GestureType.ERROR;
+        private bool tutorialGestureTrainingActive;
+        private bool tutorialWaitingForTryItOutInput;
+        private int tutorialGestureTrainingIndex;
+        private GestureType tutorialExpectedGesture = GestureType.ERROR;
+        private OrchestraSection tutorialExpectedSection = OrchestraSection.Drum;
+        private static readonly GestureType[] TutorialGestureTrainingOrder =
+        {
+            GestureType.UP,
+            GestureType.DOWN,
+            GestureType.PUNCH,
+            GestureType.WITHDRAW,
+            GestureType.W_SHAPE,
+            GestureType.HOURGLASS_SHAPE,
+            GestureType.LIGHTNING_BOLT_SHAPE,
+            GestureType.TRIPLE_CLOCKWISE_CIRCLE
+        };
 
         #region Unity Lifecycle
 
@@ -261,6 +301,15 @@ namespace OrchestraMaestro
             ResetScore();
             selectedSectionIndex = 0;
             tutorialFirstPauseShown = false;
+            tutorialNavigationTrainingActive = false;
+            tutorialLeftNavigationCompleted = false;
+            tutorialRightNavigationCompleted = false;
+            tutorialExpectedNavigationGesture = GestureType.ERROR;
+            tutorialGestureTrainingActive = false;
+            tutorialWaitingForTryItOutInput = false;
+            tutorialGestureTrainingIndex = 0;
+            tutorialExpectedGesture = GestureType.ERROR;
+            tutorialExpectedSection = OrchestraSection.Drum;
             
             // Load song data if available
             if (currentSong != null)
@@ -300,8 +349,22 @@ namespace OrchestraMaestro
             SetGameState(GameState.Playing);
             endingSfxPlayed = false;
 
-            if (ambienceSfx != null && Camera.main != null)
-                AudioSource.PlayClipAtPoint(ambienceSfx, Camera.main.transform.position, 0.5f);
+            if (GameSettings.CurrentMode == GameMode.Tutorial)
+            {
+                // In tutorial mode, play special BGM and skip audience ambience
+                if (tutorialBgm != null && audioSource != null)
+                {
+                    audioSource.clip = tutorialBgm;
+                    audioSource.loop = true;
+                    audioSource.Play();
+                }
+                BeginTutorialNavigationTraining();
+            }
+            else
+            {
+                if (ambienceSfx != null && Camera.main != null)
+                    AudioSource.PlayClipAtPoint(ambienceSfx, Camera.main.transform.position, 0.5f);
+            }
 
             Debug.Log("[RhythmGameController] Game started!");
         }
@@ -382,24 +445,58 @@ namespace OrchestraMaestro
         #region Section Navigation
 
         /// <summary>Move section selection left (wraps around)</summary>
-        public void SelectPreviousSection()
-        {
-            selectedSectionIndex = (selectedSectionIndex - 1 + 4) % 4;
-            NotifySectionChanged();
-        }
+        public void SelectPreviousSection() => NavigateSection(-1);
 
         /// <summary>Move section selection right (wraps around)</summary>
-        public void SelectNextSection()
-        {
-            selectedSectionIndex = (selectedSectionIndex + 1) % 4;
-            NotifySectionChanged();
-        }
+        public void SelectNextSection() => NavigateSection(1);
 
         /// <summary>Select a specific section</summary>
         public void SelectSection(OrchestraSection section)
         {
             selectedSectionIndex = (int)section;
             NotifySectionChanged();
+        }
+
+        private void NavigateSection(int rawDirection)
+        {
+            int direction = rawDirection < 0 ? -1 : 1;
+            if (TryAutoLock(direction)) return;
+
+            selectedSectionIndex = (selectedSectionIndex + direction + 4) % 4;
+            NotifySectionChanged();
+        }
+
+        private bool TryAutoLock(int direction)
+        {
+            var radar = CueRadarManager.Instance;
+            if (radar == null) return false;
+
+            OrchestraSection? nextTarget = radar.GetNextTargetSection();
+            if (!nextTarget.HasValue) return false;
+
+            int targetIndex = (int)nextTarget.Value;
+            if (targetIndex == selectedSectionIndex) return false;
+
+            int forwardSteps = Modulo(targetIndex - selectedSectionIndex, 4);
+            int backwardSteps = Modulo(selectedSectionIndex - targetIndex, 4);
+
+            bool movingRight = direction > 0;
+            bool rightIsCloser = forwardSteps > 0 && forwardSteps <= backwardSteps;
+            bool leftIsCloser = backwardSteps > 0 && backwardSteps <= forwardSteps;
+
+            if ((movingRight && rightIsCloser) || (!movingRight && leftIsCloser))
+            {
+                SelectSection(nextTarget.Value);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static int Modulo(int value, int modulus)
+        {
+            int result = value % modulus;
+            return result < 0 ? result + modulus : result;
         }
 
         private void NotifySectionChanged()
@@ -424,14 +521,36 @@ namespace OrchestraMaestro
         {
             if (currentState != GameState.Playing && !(rhythmMap != null && rhythmMap.IsPausedForTutorial)) return;
 
-            GestureType gesture = evt.GetGestureType();
-            
-            Debug.Log($"[RhythmGameController] Processing gesture: {gesture}");
+            GestureType[] candidateGestures = LimitCandidatesByDifficulty(evt.GetCandidateGestureTypes());
+            if (candidateGestures == null || candidateGestures.Length == 0) return;
 
-            // Handle section navigation gestures (LEFT/RIGHT) - always allow, including during tutorial pause
-            if (GestureUtils.IsSectionNavigation(gesture))
+            GestureType topGesture = candidateGestures[0];
+
+            if (topGesture == GestureType.ERROR)
             {
-                if (gesture == GestureType.LEFT)
+                Debug.Log("[RhythmGameController] Ignoring ERROR/IDLE gesture event");
+                return;
+            }
+            
+            Debug.Log($"[RhythmGameController] Processing gesture candidates: {string.Join(", ", candidateGestures)}");
+
+            if (GameSettings.CurrentMode == GameMode.Tutorial && tutorialNavigationTrainingActive)
+            {
+                HandleTutorialNavigationGesture(topGesture);
+                return;
+            }
+
+            if (GameSettings.CurrentMode == GameMode.Tutorial && tutorialGestureTrainingActive)
+            {
+                HandleTutorialGuidedGesture(topGesture);
+                return;
+            }
+
+            // Edge case: if top prediction is LEFT/RIGHT and selector is not at the expected section,
+            // treat it as section navigation instead of a top-3 scoring fallback.
+            if (ShouldTreatAsSectionNavigation(topGesture))
+            {
+                if (topGesture == GestureType.LEFT)
                     SelectPreviousSection();
                 else
                     SelectNextSection();
@@ -439,8 +558,9 @@ namespace OrchestraMaestro
                 return; // Navigation gestures don't get scored
             }
 
-            // Judge timing against rhythm map
-            ScoringResult result = rhythmMap.JudgeGesture(gesture, SelectedSection);
+            // Judge timing against rhythm map using top-3 candidates
+            ScoringResult result = rhythmMap.JudgeGestureCandidates(candidateGestures, SelectedSection);
+            GestureType matchedGesture = result.judgement == JudgementType.Miss ? topGesture : result.gestureType;
 
             // Tutorial pause: wrong gesture - show hint, don't count as miss
             if (rhythmMap != null && rhythmMap.IsPausedForTutorial && result.judgement == JudgementType.Miss)
@@ -455,7 +575,7 @@ namespace OrchestraMaestro
                 return;
             }
 
-            ProcessScoringResult(result, gesture);
+            ProcessScoringResult(result, matchedGesture);
 
             // Tutorial pause: correct gesture - resume playback
             if (rhythmMap != null && rhythmMap.IsPausedForTutorial)
@@ -464,7 +584,48 @@ namespace OrchestraMaestro
                 if (audioSource != null) audioSource.UnPause();
                 tutorialWaitingCue = null;
                 TutorialWrongGestureHint = null;
+                TutorialDialogController.Instance?.Clear();
             }
+        }
+
+        private static GestureType[] LimitCandidatesByDifficulty(GestureType[] candidates)
+        {
+            if (candidates == null || candidates.Length == 0)
+            {
+                return candidates;
+            }
+
+            int maxCandidates = GameSettings.DifficultyLevel switch
+            {
+                Difficulty.Easy => 3,
+                Difficulty.Medium => 2,
+                Difficulty.Hard => 1,
+                _ => 2
+            };
+
+            if (candidates.Length <= maxCandidates)
+            {
+                return candidates;
+            }
+
+            GestureType[] limited = new GestureType[maxCandidates];
+            Array.Copy(candidates, limited, maxCandidates);
+            return limited;
+        }
+
+        private bool ShouldTreatAsSectionNavigation(GestureType topGesture)
+        {
+            if (!GestureUtils.IsSectionNavigation(topGesture)) return false;
+
+            var radar = CueRadarManager.Instance;
+            OrchestraSection? nextTarget = radar?.GetNextTargetSection();
+
+            if (!nextTarget.HasValue)
+            {
+                return true;
+            }
+
+            return nextTarget.Value != SelectedSection;
         }
 
         private void HandleDownstroke(float timestamp)
@@ -525,6 +686,8 @@ namespace OrchestraMaestro
 
         private void PlayComboMilestoneSfx(int combo)
         {
+            if (GameSettings.CurrentMode == GameMode.Tutorial) return; // No crowd cheers in tutorial
+
             AudioClip clip = combo switch
             {
                 5 => combo5xSfx,
@@ -574,25 +737,327 @@ namespace OrchestraMaestro
             EndGame();
         }
 
+        private string GetVideoNameForGesture(GestureType gesture)
+        {
+            switch (gesture)
+            {
+                case GestureType.LEFT: return "left";
+                case GestureType.RIGHT: return "right";
+                case GestureType.UP: return "up";
+                case GestureType.DOWN: return "down";
+                case GestureType.PUNCH: return "punch";
+                case GestureType.WITHDRAW: return "withdraw";
+                case GestureType.W_SHAPE: return "w";
+                case GestureType.HOURGLASS_SHAPE: return "hourglass";
+                case GestureType.LIGHTNING_BOLT_SHAPE: return "lightning-bolt";
+                case GestureType.TRIPLE_CLOCKWISE_CIRCLE: return "triple-circle";
+                default: return null;
+            }
+        }
+
+        /// <summary>
+        /// Manual mapping for how gesture names appear in Tutorial Dialogs.
+        /// Edit these strings to change the display name.
+        /// </summary>
+        private string GetTutorialDisplayNameForGesture(GestureType gesture)
+        {
+            return gesture switch
+            {
+                GestureType.UP => "Up",
+                GestureType.DOWN => "Down",
+                GestureType.LEFT => "Left",
+                GestureType.RIGHT => "Right",
+                GestureType.PUNCH => "Punch",
+                GestureType.WITHDRAW => "Withdraw",
+                GestureType.W_SHAPE => "W Shape",
+                GestureType.HOURGLASS_SHAPE => "Hourglass",
+                GestureType.LIGHTNING_BOLT_SHAPE => "Lightning",
+                GestureType.TRIPLE_CLOCKWISE_CIRCLE => "Triple Circle",
+                _ => gesture.ToString().Replace("_SHAPE", "").Replace("_", " ")
+            };
+        }
+
+        private string GetSignificanceForGesture(GestureType gesture)
+        {
+            switch (gesture)
+            {
+                case GestureType.UP: return "Use in an orchestra: Crescendo (gradually getting louder).";
+                case GestureType.DOWN: return "Use in an orchestra: Decrescendo (gradually getting softer).";
+                case GestureType.PUNCH: return "Use in an orchestra: Accent (emphasize a single note).";
+                case GestureType.WITHDRAW: return "Use in an orchestra: Cutoff (immediately cease all sound).";
+                case GestureType.W_SHAPE: return "Use in an orchestra: Sforzando (sudden, strong emphasis on a single note).";
+                case GestureType.HOURGLASS_SHAPE: return "Use in an orchestra: Fortissimo (extremely loud & powerful passage).";
+                case GestureType.LIGHTNING_BOLT_SHAPE: return "Use in an orchestra: Pianissimo (extremely soft & delicate passage).";
+                case GestureType.TRIPLE_CLOCKWISE_CIRCLE: return "Use in an orchestra: Grand Finale (dramatic conclusion of the song).";
+                case GestureType.LEFT: return "Known as a section cue, this gesture is used to switch the conducting focus to the left";
+                case GestureType.RIGHT: return "Known as a section cue, this gesture is used to switch the conducting focus to the right";
+                default: return "";
+            }
+        }
+
+        private void BeginTutorialNavigationTraining()
+        {
+            if (rhythmMap == null) return;
+
+            tutorialNavigationTrainingActive = true;
+            tutorialLeftNavigationCompleted = false;
+            tutorialRightNavigationCompleted = false;
+            tutorialExpectedNavigationGesture = GestureType.LEFT;
+            tutorialExpectedGesture = GestureType.ERROR;
+            tutorialGestureTrainingActive = false;
+            tutorialWaitingForTryItOutInput = false;
+            TutorialWrongGestureHint = null;
+
+            rhythmMap.PauseForTutorial(rhythmMap.CurrentSongTime);
+            if (audioSource != null && audioSource.isPlaying)
+                audioSource.Pause();
+
+            if (TutorialDialogController.Instance == null)
+            {
+                var go = new GameObject("TutorialDialogController");
+                go.AddComponent<TutorialDialogController>();
+            }
+
+            string msg = "During gameplay navigation gestures are used to select the right section.\n\n You will first learn how to navigate left";
+            TutorialDialogController.Instance?.Show(
+                msg,
+                () => {
+                    tutorialExpectedNavigationGesture = GestureType.LEFT;
+                    tutorialWaitingForTryItOutInput = true;
+                },
+                LoadTutorialClipForGesture(GestureType.LEFT),
+                "Try it out");
+        }
+
+        private void HandleTutorialNavigationGesture(GestureType performedGesture)
+        {
+            if (!tutorialWaitingForTryItOutInput) return;
+
+            if (tutorialExpectedNavigationGesture == GestureType.LEFT)
+            {
+                if (performedGesture == GestureType.LEFT)
+                {
+                    tutorialLeftNavigationCompleted = true;
+                    SelectPreviousSection();
+                    TutorialWrongGestureHint = null;
+                    tutorialWaitingForTryItOutInput = false;
+
+                    string msg = "Similarly, you can navigate right. Try it out!";
+                    TutorialDialogController.Instance?.Show(
+                        msg,
+                        () => {
+                            tutorialExpectedNavigationGesture = GestureType.RIGHT;
+                            tutorialWaitingForTryItOutInput = true;
+                        },
+                        LoadTutorialClipForGesture(GestureType.RIGHT),
+                        "Try it out");
+                    return;
+                }
+
+                TutorialWrongGestureHint = "Please try performing the left gesture again.";
+                tutorialWrongGestureTime = Time.time;
+                return;
+            }
+
+            if (tutorialExpectedNavigationGesture == GestureType.RIGHT)
+            {
+                if (performedGesture == GestureType.RIGHT)
+                {
+                    tutorialRightNavigationCompleted = true;
+                    SelectNextSection();
+                    TutorialWrongGestureHint = null;
+                    tutorialWaitingForTryItOutInput = false;
+                    CompleteTutorialNavigationTraining();
+                    return;
+                }
+
+                TutorialWrongGestureHint = "Please try performing the right gesture again.";
+                tutorialWrongGestureTime = Time.time;
+            }
+        }
+
+        private void CompleteTutorialNavigationTraining()
+        {
+            tutorialNavigationTrainingActive = false;
+            tutorialExpectedNavigationGesture = GestureType.ERROR;
+            tutorialWaitingForTryItOutInput = false;
+
+            TutorialDialogController.Instance?.Clear();
+
+            BeginTutorialGestureTraining();
+
+            Debug.Log("[RhythmGameController] Tutorial navigation training completed (LEFT/RIGHT)");
+        }
+
+        private void BeginTutorialGestureTraining()
+        {
+            tutorialGestureTrainingActive = true;
+            tutorialGestureTrainingIndex = 0;
+            tutorialExpectedGesture = GestureType.ERROR;
+            tutorialWaitingForTryItOutInput = false;
+
+            ShowCurrentTutorialGestureStep();
+        }
+
+        private void ShowCurrentTutorialGestureStep()
+        {
+            if (tutorialGestureTrainingIndex < 0 || tutorialGestureTrainingIndex >= TutorialGestureTrainingOrder.Length)
+            {
+                CompleteTutorialGestureTraining();
+                return;
+            }
+
+            GestureType gesture = TutorialGestureTrainingOrder[tutorialGestureTrainingIndex];
+            OrchestraSection targetSection = (OrchestraSection)(tutorialGestureTrainingIndex % 4);
+            
+            string gestureDisplayName = GetTutorialDisplayNameForGesture(gesture);
+            string message =
+                $"Next gesture: {gestureDisplayName} \n Please Move the selector to {targetSection}, then perform {gestureDisplayName}.";
+
+            tutorialExpectedGesture = gesture;
+            tutorialExpectedSection = targetSection;
+            tutorialWaitingForTryItOutInput = false;
+
+            TutorialDialogController.Instance?.Clear();
+            TutorialDialogController.Instance?.Show(
+                message,
+                () => tutorialWaitingForTryItOutInput = true,
+                LoadTutorialClipForGesture(gesture),
+                "Try it out");
+        }
+
+        private void HandleTutorialGuidedGesture(GestureType performedGesture)
+        {
+            if (!tutorialWaitingForTryItOutInput) return;
+
+            if (performedGesture == GestureType.LEFT)
+            {
+                SelectPreviousSection();
+                return;
+            }
+
+            if (performedGesture == GestureType.RIGHT)
+            {
+                SelectNextSection();
+                return;
+            }
+
+            if (performedGesture == tutorialExpectedGesture)
+            {
+                if (SelectedSection != tutorialExpectedSection)
+                {
+                    TutorialWrongGestureHint = $"Move selector to {tutorialExpectedSection} using LEFT/RIGHT, then perform {tutorialExpectedGesture}.";
+                    tutorialWrongGestureTime = Time.time;
+                    return;
+                }
+
+                TutorialWrongGestureHint = null;
+                tutorialWaitingForTryItOutInput = false;
+
+                string significance = GetSignificanceForGesture(tutorialExpectedGesture);
+                string gestureDisplayName = GetTutorialDisplayNameForGesture(tutorialExpectedGesture);
+                string scoreMsg = $"Success! You performed {gestureDisplayName} correctly.\n\n" + significance;
+
+                TutorialDialogController.Instance?.Show(
+                    scoreMsg,
+                    () => {
+                        tutorialGestureTrainingIndex++;
+                        ShowCurrentTutorialGestureStep();
+                    },
+                    null,
+                    "Next Gesture");
+                return;
+            }
+
+            string wrongGestureName = GetTutorialDisplayNameForGesture(tutorialExpectedGesture);
+            TutorialWrongGestureHint = $"Wrong gesture. Try {wrongGestureName} on {tutorialExpectedSection}.";
+            tutorialWrongGestureTime = Time.time;
+        }
+
+        private void CompleteTutorialGestureTraining()
+        {
+            tutorialGestureTrainingActive = false;
+            tutorialWaitingForTryItOutInput = false;
+            tutorialExpectedGesture = GestureType.ERROR;
+            tutorialExpectedSection = OrchestraSection.Drum;
+
+            string finalMsg = "Great job! You've learned all the gestures and how they influence the orchestra.\n\nNow continue playing the song, use LEFT/RIGHT to navigate, and match the incoming cues!";
+
+            TutorialDialogController.Instance?.Show(
+                finalMsg,
+                () => {
+                    if (rhythmMap != null)
+                        rhythmMap.ResumeFromTutorial();
+                    if (audioSource != null)
+                        audioSource.UnPause();
+                },
+                null,
+                "Start Song");
+
+            Debug.Log("[RhythmGameController] Guided tutorial gesture training completed");
+        }
+
+        private UnityEngine.Video.VideoClip LoadTutorialClipForGesture(GestureType gesture)
+        {
+            string videoName = GetVideoNameForGesture(gesture);
+            if (string.IsNullOrEmpty(videoName)) return null;
+
+            var clip = UnityEngine.Resources.Load<UnityEngine.Video.VideoClip>("GIFS_WEBM/" + videoName);
+            if (clip == null)
+            {
+                clip = UnityEngine.Resources.Load<UnityEngine.Video.VideoClip>("GIFS/" + videoName);
+            }
+            if (clip == null)
+            {
+                Debug.LogWarning($"[RhythmGameController] Tutorial video not found: Resources/GIFS_WEBM/{videoName}.webm (or GIFS/{videoName})");
+            }
+            return clip;
+        }
+
+        private void ShowTutorialNavigationPrompt(GestureType gesture, Action onTryItOut)
+        {
+            string message = gesture == GestureType.LEFT
+                ? "Navigation gesture: LEFT moves the selector to the previous character. Watch and tap TRY IT OUT."
+                : "Navigation gesture: RIGHT moves the selector to the next character. Watch and tap TRY IT OUT.";
+
+            TutorialDialogController.Instance?.Clear();
+            TutorialDialogController.Instance?.Show(
+                message,
+                onTryItOut,
+                LoadTutorialClipForGesture(gesture),
+                "Try it out");
+        }
+
         private void HandleTutorialPauseRequested(RhythmCue cue)
         {
             if (currentState != GameState.Playing) return;
+
+            if (GameSettings.CurrentMode == GameMode.Tutorial)
+            {
+                return;
+            }
+
             rhythmMap.PauseForTutorial(cue.timestamp);
             if (audioSource != null && audioSource.isPlaying)
                 audioSource.Pause();
             tutorialWaitingCue = cue;
             TutorialWrongGestureHint = null;
 
-            if (!tutorialFirstPauseShown)
+            if (TutorialDialogController.Instance == null)
             {
-                tutorialFirstPauseShown = true;
-                if (TutorialDialogController.Instance == null)
-                {
-                    var go = new GameObject("TutorialDialogController");
-                    go.AddComponent<TutorialDialogController>();
-                }
-                TutorialDialogController.Instance?.Show("When you see a gesture, perform it! The song will pause so you can practice.");
+                var go = new GameObject("TutorialDialogController");
+                go.AddComponent<TutorialDialogController>();
             }
+
+            string videoName = GetVideoNameForGesture(cue.gestureType);
+            UnityEngine.Video.VideoClip clip = LoadTutorialClipForGesture(cue.gestureType);
+
+            string msg = tutorialFirstPauseShown 
+                ? $"Now perform the {cue.gestureType} gesture." 
+                : $"When you see a gesture, perform it! The song will pause so you can practice.\n\nFirst up: {cue.gestureType}";
+            
+            tutorialFirstPauseShown = true;
+            TutorialDialogController.Instance?.Show(msg, null, clip);
 
             Debug.Log($"[RhythmGameController] Tutorial pause at cue: {cue.gestureType} for {cue.targetSection}");
         }

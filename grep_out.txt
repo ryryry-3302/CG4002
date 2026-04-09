@@ -1,0 +1,199 @@
+86:        /// <summary>Tutorial: wrong gesture hint to display. Cleared when correct or after timeout.</summary>
+87:        public string TutorialWrongGestureHint { get; private set; }
+88:        /// <summary>Tutorial: whether playback is paused waiting for user gesture.</summary>
+89:        public bool IsTutorialPaused => rhythmMap != null && rhythmMap.IsPausedForTutorial;
+90-
+91-        /// <summary>Current playback time in seconds. 0 if no map.</summary>
+92-        public float CurrentSongTime => rhythmMap != null ? rhythmMap.CurrentSongTime : 0f;
+93-        
+94-        public float TempoSectionStart => rhythmMap != null ? rhythmMap.TempoSectionStart : -1f;
+95-        public float TempoSectionEnd => rhythmMap != null ? rhythmMap.TempoSectionEnd : -1f;
+96-        private float tutorialWrongGestureTime;
+97-        private bool endingSfxPlayed;
+98-
+99-        #region Unity Lifecycle
+100-
+101-        private void Awake()
+102-        {
+103-            if (Instance != null && Instance != this)
+104-            {
+105-                Destroy(gameObject);
+106-                return;
+107-            }
+108-            Instance = this;
+109-            
+--
+154:                rhythmMap.OnTutorialPauseRequested -= HandleTutorialPauseRequested;
+155-                rhythmMap.OnCueMissed += HandleCueMissed;
+156-                rhythmMap.OnCueAutoHit += HandleCueAutoHit;
+157-                rhythmMap.OnSongFinished += HandleSongFinished;
+158:                rhythmMap.OnTutorialPauseRequested += HandleTutorialPauseRequested;
+159-            }
+160-
+161-            // Subscribe to orchestra placement lock event
+162-            if (orchestraPlacement != null)
+163-            {
+164-                orchestraPlacement.OnPlacementsLocked -= HandlePlacementsLocked;
+165-                orchestraPlacement.OnPlacementsLocked += HandlePlacementsLocked;
+166-            }
+167-        }
+168-
+169-        private void HandlePlacementsLocked()
+170-        {
+171-            Debug.Log("[RhythmGameController] Placements locked - awaiting song selection");
+172-            // Game stays in Setup; song selection UI will call SelectSongAndStart when user picks
+173-        }
+174-
+175-        private void Update()
+176-        {
+177:            if (!string.IsNullOrEmpty(TutorialWrongGestureHint) && Time.time - tutorialWrongGestureTime > 3f)
+178:                TutorialWrongGestureHint = null;
+179-
+180-            // BPM Preview: Vibrate at BPM for 5 seconds before tempo section starts
+181-            if (currentState == GameState.Playing && TempoSectionStart >= 0)
+182-            {
+183-                float currentTime = CurrentSongTime;
+184-                float previewStartTime = TempoSectionStart - BPM_PREVIEW_LEAD_TIME;
+185-                
+186-                // Check if we should start BPM preview
+187-                if (!bpmPreviewActive && currentTime >= previewStartTime && currentTime < TempoSectionStart)
+188-                {
+189-                    StartBpmPreview();
+190-                }
+191-                // Check if we should stop BPM preview (reached tempo section)
+192-                else if (bpmPreviewActive && currentTime >= TempoSectionStart)
+193-                {
+194-                    StopBpmPreview();
+195-                }
+196-            }
+197-
+198-            // Ending SFX: play once when entering last 10 seconds
+--
+234:                rhythmMap.OnTutorialPauseRequested -= HandleTutorialPauseRequested;
+235-            }
+236-
+237-            if (Instance == this) Instance = null;
+238-        }
+239-
+240-        #endregion
+241-
+242-        #region Game Flow
+243-
+244-        /// <summary>Start a test game with the built-in test map</summary>
+245-        public void StartTestGame()
+246-        {
+247-            if (rhythmMap == null)
+248-            {
+249-                Debug.LogError("[RhythmGameController] RhythmMap reference not set!");
+250-                return;
+251-            }
+252-
+253-            rhythmMap.LoadTestMap();
+254-            StartGame();
+--
+459:            if (currentState != GameState.Playing && !(rhythmMap != null && rhythmMap.IsPausedForTutorial)) return;
+460-
+461-            GestureType[] candidateGestures = LimitCandidatesByDifficulty(evt.GetCandidateGestureTypes());
+462-            if (candidateGestures == null || candidateGestures.Length == 0) return;
+463-
+464-            GestureType topGesture = candidateGestures[0];
+465-
+466-            if (topGesture == GestureType.ERROR)
+467-            {
+468-                Debug.Log("[RhythmGameController] Ignoring ERROR/IDLE gesture event");
+469-                return;
+470-            }
+471-            
+472-            Debug.Log($"[RhythmGameController] Processing gesture candidates: {string.Join(", ", candidateGestures)}");
+473-
+474-            // Edge case: if top prediction is LEFT/RIGHT and selector is not at the expected section,
+475-            // treat it as section navigation instead of a top-3 scoring fallback.
+476-            if (ShouldTreatAsSectionNavigation(topGesture))
+477-            {
+478-                if (topGesture == GestureType.LEFT)
+479-                    SelectPreviousSection();
+--
+490:            // Tutorial pause: wrong gesture - show hint, don't count as miss
+491:            if (rhythmMap != null && rhythmMap.IsPausedForTutorial && result.judgement == JudgementType.Miss)
+492-            {
+493-                if (tutorialWaitingCue.HasValue)
+494-                {
+495-                    var cue = tutorialWaitingCue.Value;
+496-                    string sectionName = cue.targetSection.HasValue ? cue.targetSection.Value.ToString() : "any";
+497:                    TutorialWrongGestureHint = $"Try {cue.gestureType} for {sectionName}. Use LEFT/RIGHT to change section.";
+498-                    tutorialWrongGestureTime = Time.time;
+499-                }
+500-                return;
+501-            }
+502-
+503-            ProcessScoringResult(result, matchedGesture);
+504-
+505:            // Tutorial pause: correct gesture - resume playback
+506:            if (rhythmMap != null && rhythmMap.IsPausedForTutorial)
+507-            {
+508:                rhythmMap.ResumeFromTutorial();
+509-                if (audioSource != null) audioSource.UnPause();
+510-                tutorialWaitingCue = null;
+511:                TutorialWrongGestureHint = null;
+512-            }
+513-        }
+514-
+515-        private static GestureType[] LimitCandidatesByDifficulty(GestureType[] candidates)
+516-        {
+517-            if (candidates == null || candidates.Length == 0)
+518-            {
+519-                return candidates;
+520-            }
+521-
+522-            int maxCandidates = GameSettings.DifficultyLevel switch
+523-            {
+524-                Difficulty.Easy => 3,
+525-                Difficulty.Medium => 2,
+526-                Difficulty.Hard => 1,
+527-                _ => 2
+528-            };
+529-
+530-            if (candidates.Length <= maxCandidates)
+531-            {
+--
+662:        private void HandleTutorialPauseRequested(RhythmCue cue)
+663-        {
+664-            if (currentState != GameState.Playing) return;
+665:            rhythmMap.PauseForTutorial(cue.timestamp);
+666-            if (audioSource != null && audioSource.isPlaying)
+667-                audioSource.Pause();
+668-            tutorialWaitingCue = cue;
+669:            TutorialWrongGestureHint = null;
+670-
+671-            if (!tutorialFirstPauseShown)
+672-            {
+673-                tutorialFirstPauseShown = true;
+674:                if (TutorialDialogController.Instance == null)
+675-                {
+676:                    var go = new GameObject("TutorialDialogController");
+677:                    go.AddComponent<TutorialDialogController>();
+678-                }
+679:                TutorialDialogController.Instance?.Show("When you see a gesture, perform it! The song will pause so you can practice.");
+680-            }
+681-
+682:            Debug.Log($"[RhythmGameController] Tutorial pause at cue: {cue.gestureType} for {cue.targetSection}");
+683-        }
+684-
+685-        private RhythmCue? tutorialWaitingCue;
+686-        private bool tutorialFirstPauseShown;
+687-        
+688-        /// <summary>Return to song selection (keeps placements). Called from Play Again.</summary>
+689-        public void ReturnToSongSelection()
+690-        {
+691-            Debug.Log("[RhythmGameController] Returning to song selection...");
+692-
+693-            rhythmMap.StopPlayback();
+694-            if (audioSource != null && audioSource.isPlaying)
+695-                audioSource.Stop();
+696-
+697-            if (CueRadarManager.Instance != null)
+698-                CueRadarManager.Instance.ResetForNewGame();
+699-
+700-            SetGameState(GameState.Setup);
+701-        }
+702-

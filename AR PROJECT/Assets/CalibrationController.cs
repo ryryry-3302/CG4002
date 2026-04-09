@@ -36,6 +36,9 @@ namespace OrchestraMaestro
         // Completion flag
         private bool completionHandled = false;
 
+        /// <summary>Whether calibration overlay/flow is currently active.</summary>
+        public bool IsCalibrating => isCalibrating;
+
         #region Unity Lifecycle
 
         private void Awake()

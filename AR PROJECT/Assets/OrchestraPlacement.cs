@@ -130,7 +130,7 @@ public class OrchestraPlacement : MonoBehaviour
         {
             EnsureTutorialDialogController();
             TutorialDialogController.Instance?.Show(
-                "Welcome! Let's set up your orchestra. Tap a plane to place each musician, or use Auto Place for quick setup.",
+                "Welcome! Let's set up your orchestra. Tap a plane and select Auto Place for aquick setup.\n\n During the game you will be squeezing your LEFT hand to start a gesture, and releasing to finish it.",
                 () => tutorialStep = 1);
         }
 
@@ -637,10 +637,10 @@ public class OrchestraPlacement : MonoBehaviour
         OnPlacementsLocked?.Invoke();
         Debug.Log("[OrchestraPlacement] Placements locked");
         
-        // Check if this is the first launch and calibration is needed
-        if (!PlayerPrefs.HasKey("HasCalibratedLeftGlove"))
+        // Check if this is the first launch and calibration is needed, or if Tutorial Mode forces it
+        if (GameSettings.CurrentMode == GameMode.Tutorial || !PlayerPrefs.HasKey("HasCalibratedLeftGlove"))
         {
-            Debug.Log("[OrchestraPlacement] First launch - starting calibration (will block game HUD)");
+            Debug.Log("[OrchestraPlacement] Starting calibration (will block game HUD)");
             StartCalibrationFlow();
             // NOTE: ProceedToGameHUD() will be called after calibration completes
         }
@@ -702,6 +702,26 @@ public class OrchestraPlacement : MonoBehaviour
         
         // Make characters static until a correct cue triggers their animation
         SetAllSectionAnimatorsSpeed(0f);
+
+        if (GameSettings.CurrentMode == GameMode.Tutorial)
+        {
+            var ctrl = RhythmGameController.Instance;
+            if (ctrl != null)
+            {
+                var tutorialSong = ScriptableObject.CreateInstance<SongData>();
+                tutorialSong.songName = "Tutorial";
+                tutorialSong.artistName = "Learn the gestures";
+                tutorialSong.bpm = 120f;
+                tutorialSong.offset = 0f;
+                tutorialSong.rhythmMapJson = Resources.Load<TextAsset>("Tutorial_Map");
+                
+                // Hide tutorial step 2 text
+                tutorialStep = 4; // bypass song selection hint
+                
+                ctrl.SelectSongAndStart(tutorialSong);
+                Debug.Log("[OrchestraPlacement] Auto-started tutorial map.");
+            }
+        }
     }
     
     /// <summary>Start manual calibration from in-game UI</summary>
@@ -1385,6 +1405,10 @@ public class OrchestraPlacement : MonoBehaviour
         
         if (gameState == RhythmGameController.GameState.Setup)
         {
+            if (CalibrationController.Instance != null && CalibrationController.Instance.IsCalibrating)
+            {
+                return;
+            }
             DrawSongSelection();
             return;
         }
@@ -1452,67 +1476,85 @@ public class OrchestraPlacement : MonoBehaviour
             labelStyle.wordWrap = savedWrap;
             labelStyle.fontSize = savedSize;
         }
-        // ── Tuning Gauge (Only visible during the tempo section) ──
-        else if (tempoStart > 0 && t >= tempoStart && t < tempoEnd && targetBpm > 0)
-        {
-            float gaugeW = 240f;
-            float gaugeH = 16f;
-            float gaugeX = (sw - gaugeW) / 2f;
-            float gaugeY = sh / 2f - 10f; // Shifted slightly down for better centering
-            
-            // Draw text
-            string adviceText = "Keep Tempo";
-            if (currentStickBpm <= 0)
-                adviceText = "Start Conducting!";
-            else if (absDiff > 5f) 
-                adviceText = bpmDiff > 0 ? "Slow Down!" : "Speed Up!";
-                
-            int savedSize = labelStyle.fontSize;
-            bool savedWrap = labelStyle.wordWrap;
-            labelStyle.wordWrap = false; // Prevent wrap-shifting inside DrawOutlinedLabel
-            
-            labelStyle.fontSize = 22;
-            labelStyle.alignment = TextAnchor.MiddleCenter;
-            DrawOutlinedLabel(new Rect(gaugeX - 50, gaugeY - 35, gaugeW + 100, 30), adviceText, labelStyle, bpmColor);
+            // ── Tuning Gauge (Only visible during the tempo section) ──
+            else if (tempoStart > 0 && t >= tempoStart && t < tempoEnd && targetBpm > 0)
+            {
+                float gaugeW = 240f;
+                float gaugeH = 16f;
+                float gaugeX = (sw - gaugeW) / 2f;
+                float gaugeY = sh / 2f - 10f; // Shifted slightly down for better centering
 
-            // Background track
-            Color oldGuiColor = GUI.color;
-            GUI.color = new Color(0, 0, 0, 0.5f);
-            GUI.DrawTexture(new Rect(gaugeX, gaugeY, gaugeW, gaugeH), texSliderBg);
-            GUI.color = oldGuiColor;
-            
-            // Draw marker
-            // Map [-30 BPM, +30 BPM] difference to [-gaugeW/2, +gaugeW/2]
-            float maxDiffVisualized = 30f; 
-            float activeDiff = currentStickBpm > 0 ? bpmDiff : -maxDiffVisualized;
-            float markerPct = Mathf.Clamp(activeDiff / maxDiffVisualized, -1f, 1f); 
-            float markerX = gaugeX + (gaugeW / 2f) + (markerPct * (gaugeW / 2f));
-            
-            Color fillCol = currentStickBpm > 0 ? bpmColor : Color.gray;
-            texSliderFill.SetPixel(0, 0, new Color(fillCol.r, fillCol.g, fillCol.b, 1f));
-            texSliderFill.Apply();
-            GUI.DrawTexture(new Rect(markerX - 3, gaugeY - 4, 6, gaugeH + 8), texSliderFill);
-            
-            // Visual beat pulse for the target center line
-            float beatInterval = 60f / targetBpm;
-            float songOffset = ctrl?.CurrentSong != null ? ctrl.CurrentSong.offset : 0f;
-            float timeSinceBeat = (t - songOffset) % beatInterval;
-            if (timeSinceBeat < 0) timeSinceBeat += beatInterval;
-            float pulseActive = timeSinceBeat < 0.15f ? 1f : 0f;
-            
-            // Target center line (flashes white on beat)
-            Color oldCol = GUI.color;
-            GUI.color = pulseActive > 0 ? Color.white : new Color(1f, 1f, 1f, 0.5f);
-            GUI.DrawTexture(new Rect(gaugeX + gaugeW / 2f - (1 + pulseActive), gaugeY - 6 - (pulseActive * 2), 2 + (pulseActive * 2), gaugeH + 12 + (pulseActive * 4)), texSliderMarker);
-            GUI.color = oldCol;
-            
-            // Instructions below gauge
-            labelStyle.fontSize = 13;
-            DrawOutlinedLabel(new Rect(gaugeX - 50, gaugeY + 24, gaugeW + 100, 20), "Tempo Section - maintain target BPM", labelStyle, new Color(0.8f, 0.8f, 0.8f));
-            
-            labelStyle.wordWrap = savedWrap;
-            labelStyle.fontSize = savedSize;
-        }
+                // Visual beat pulse for the target center line (also drives text blinking)
+                float beatInterval = 60f / targetBpm;
+                float songOffset = ctrl?.CurrentSong != null ? ctrl.CurrentSong.offset : 0f;
+                float timeSinceBeat = (t - songOffset) % beatInterval;
+                if (timeSinceBeat < 0) timeSinceBeat += beatInterval;
+                float pulseActive = timeSinceBeat < 0.15f ? 1f : 0f;
+                float tempoTextAlpha = pulseActive > 0f ? 1f : 0.55f;
+                
+                // Draw text
+                string adviceText = "Keep Tempo";
+                if (currentStickBpm <= 0)
+                    adviceText = "Start Conducting!";
+                else if (absDiff > 5f) 
+                    adviceText = bpmDiff > 0 ? "Slow Down!" : "Speed Up!";
+                    
+                int savedSize = labelStyle.fontSize;
+                bool savedWrap = labelStyle.wordWrap;
+                labelStyle.wordWrap = false; // Prevent wrap-shifting inside DrawOutlinedLabel
+                
+                labelStyle.fontSize = 22;
+                labelStyle.alignment = TextAnchor.MiddleCenter;
+                Color adviceColor = bpmColor;
+                adviceColor.a = tempoTextAlpha;
+                DrawOutlinedLabel(new Rect(gaugeX - 50, gaugeY - 35, gaugeW + 100, 30), adviceText, labelStyle, adviceColor);
+
+                // Background track
+                Color oldGuiColor = GUI.color;
+                GUI.color = new Color(0, 0, 0, 0.5f);
+                GUI.DrawTexture(new Rect(gaugeX, gaugeY, gaugeW, gaugeH), texSliderBg);
+                GUI.color = oldGuiColor;
+                
+                // Draw marker
+                // Map [-30 BPM, +30 BPM] difference to [-gaugeW/2, +gaugeW/2]
+                float maxDiffVisualized = 30f; 
+                float activeDiff = currentStickBpm > 0 ? bpmDiff : -maxDiffVisualized;
+                float markerPct = Mathf.Clamp(activeDiff / maxDiffVisualized, -1f, 1f); 
+                float markerX = gaugeX + (gaugeW / 2f) + (markerPct * (gaugeW / 2f));
+                
+                Color fillCol = currentStickBpm > 0 ? bpmColor : Color.gray;
+                texSliderFill.SetPixel(0, 0, new Color(fillCol.r, fillCol.g, fillCol.b, 1f));
+                texSliderFill.Apply();
+                GUI.DrawTexture(new Rect(markerX - 3, gaugeY - 4, 6, gaugeH + 8), texSliderFill);
+                
+                // Target center line (flashes white on beat)
+                Color oldCol = GUI.color;
+                GUI.color = pulseActive > 0 ? Color.white : new Color(1f, 1f, 1f, 0.5f);
+                GUI.DrawTexture(new Rect(gaugeX + gaugeW / 2f - (1 + pulseActive), gaugeY - 6 - (pulseActive * 2), 2 + (pulseActive * 2), gaugeH + 12 + (pulseActive * 4)), texSliderMarker);
+                GUI.color = oldCol;
+                
+                // Instructions below gauge
+                labelStyle.fontSize = 13;
+                DrawOutlinedLabel(new Rect(gaugeX - 50, gaugeY + 24, gaugeW + 100, 20), "Tempo Section - maintain target BPM", labelStyle, new Color(0.8f, 0.8f, 0.8f, tempoTextAlpha));
+
+                // BPM readout
+                labelStyle.fontSize = 14;
+                labelStyle.alignment = TextAnchor.MiddleLeft;
+                DrawOutlinedLabel(
+                    new Rect(gaugeX, gaugeY + 40, gaugeW / 2f, 20),
+                    string.Format("Current: {0} BPM", currentStickBpm > 0 ? currentStickBpm.ToString("F0") : "--"),
+                    labelStyle,
+                    bpmColor);
+                labelStyle.alignment = TextAnchor.MiddleRight;
+                DrawOutlinedLabel(
+                    new Rect(gaugeX + gaugeW / 2f, gaugeY + 40, gaugeW / 2f, 20),
+                    $"Target: {targetBpm:F0} BPM",
+                    labelStyle,
+                    new Color(1f, 1f, 1f, tempoTextAlpha));
+                
+                labelStyle.wordWrap = savedWrap;
+                labelStyle.fontSize = savedSize;
+            }
         else if (tempoStart > 0 && t >= tempoEnd && t < tempoEnd + 3.0f && finalTempoScore >= 0f)
         {
             // Show score for 3 seconds
@@ -1566,9 +1608,23 @@ public class OrchestraPlacement : MonoBehaviour
         // ── Top-center: gesture prompt (bold, no box) + timing slider ──
         var cueInfo = CueRadarManager.Instance?.GetCurrentActiveGesture() ?? (null, null, Color.white);
         float cueProgress = CueRadarManager.Instance?.GetCurrentCueProgress() ?? -1f;
-        
-        if (cueInfo.gestureName != null)
+
+        bool isTutorialDialogVisible = TutorialDialogController.Instance != null && TutorialDialogController.Instance.IsShowing();
+
+        if (cueInfo.gestureName == null && ctrl != null && ctrl.TryGetGuidedTutorialCue(out GestureType guidedGesture, out OrchestraSection guidedSection))
         {
+            cueInfo = (FormatGestureLabel(guidedGesture), guidedSection.ToString(), new Color(1f, 0.9f, 0.5f));
+            cueProgress = -1f; // no countdown timer in guided tutorial
+        }
+        
+        if (cueInfo.gestureName != null && !isTutorialDialogVisible)
+        {
+            // Draw world-space target indicator for the active section
+            if (System.Enum.TryParse(cueInfo.sectionName, out OrchestraSection activeSection))
+            {
+                DrawGuidedTargetWorldIndicator(activeSection);
+            }
+
             float promptW = 260f;
             float promptX = (sw - promptW) / 2f;
             
@@ -1607,6 +1663,11 @@ public class OrchestraPlacement : MonoBehaviour
                 GUI.DrawTexture(new Rect(sliderX + sliderW - 2, sliderY - 1, 3, sliderH + 2), texSliderMarker);
             }
         }
+
+        if (ctrl != null && ctrl.TryGetGuidedTutorialCue(out GestureType _, out OrchestraSection guidedTargetSection) && !isTutorialDialogVisible)
+        {
+            DrawGuidedTargetWorldIndicator(guidedTargetSection);
+        }
         
         // ── Right-center: skip button ──
         if (ctrl != null && ctrl.CanSkipToFirstCue)
@@ -1635,7 +1696,7 @@ public class OrchestraPlacement : MonoBehaviour
         }
 
         // ── Tutorial: paused — perform gesture ──
-        if (ctrl != null && ctrl.IsTutorialPaused)
+        if (ctrl != null && ctrl.IsTutorialPaused && !isTutorialDialogVisible)
         {
             headerStyle.normal.textColor = new Color(1f, 0.9f, 0.5f);
             GUI.Label(new Rect((sw - 200f) / 2f, sh * 0.25f, 200f, 30f), "Perform the gesture!", headerStyle);
@@ -1663,7 +1724,23 @@ public class OrchestraPlacement : MonoBehaviour
             UnlockPlacements();
         }
     }
-    
+
+    private string FormatGestureLabel(GestureType gesture)
+    {
+        return gesture switch
+        {
+            GestureType.UP => "↑ UP",
+            GestureType.DOWN => "↓ DOWN",
+            GestureType.PUNCH => "👊 PUNCH",
+            GestureType.WITHDRAW => "👊 WITHDRAW",
+            GestureType.W_SHAPE => "W",
+            GestureType.HOURGLASS_SHAPE => "Hourglass",
+            GestureType.LIGHTNING_BOLT_SHAPE => "Lightning Bolt",
+            GestureType.TRIPLE_CLOCKWISE_CIRCLE => "Triple Circle",
+            _ => gesture.ToString().Replace("_SHAPE", "").Replace("_", " ")
+        };
+    }
+
     private void DrawOutlinedLabel(Rect rect, string text, GUIStyle style, Color fgColor)
     {
         float a = fgColor.a;
@@ -1753,6 +1830,60 @@ public class OrchestraPlacement : MonoBehaviour
         GUILayout.EndArea();
     }
     
+    // Add logic for drawing indicator above characters in tutorial
+    private void DrawGuidedTargetWorldIndicator(OrchestraSection targetSection)
+    {
+        Vector3? headPos = GetSectionHeadPosition(targetSection);
+        if (!headPos.HasValue) return;
+
+        Vector3 screenPos = Camera.main.WorldToScreenPoint(headPos.Value);
+        if (screenPos.z < 0) return; // Behind camera
+
+        // Convert to our 1/3 scale GUI coordinates
+        float guiX = screenPos.x / 3f;
+        float guiY = (Screen.height - screenPos.y) / 3f;
+
+        // Draw a floating "▼ TARGET" above the character
+        GUIStyle targetStyle = new GUIStyle(GUI.skin.label);
+        targetStyle.fontSize = 18;
+        targetStyle.fontStyle = FontStyle.Bold;
+        targetStyle.alignment = TextAnchor.MiddleCenter;
+        targetStyle.normal.textColor = Color.yellow;
+
+        // Pulse effect
+        float pulse = 1f + Mathf.Sin(Time.time * 8f) * 0.15f;
+        targetStyle.fontSize = Mathf.RoundToInt(18 * pulse);
+
+        // Adjust for pulsating size centering
+        Rect labelRect = new Rect(guiX - 100, guiY - 40, 200, 30);
+        DrawOutlinedLabel(labelRect, "▼ TARGET", targetStyle, Color.yellow);
+    }
+
+    private Vector3? GetSectionHeadPosition(OrchestraSection section)
+    {
+        List<GameObject> members = sectionMembers[(int)section];
+        if (members == null || members.Count == 0) return null;
+        
+        GameObject member = members[0];
+        if (member == null) return null;
+
+        // Find visual top
+        Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+        if (renderers.Length > 0)
+        {
+            Bounds b = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
+            
+            // Adjust height offset per section
+            float offset = (section == OrchestraSection.Pipe || section == OrchestraSection.Flute) 
+                ? -0.05f   // Bring target down inside the bounds for Pipe/Flute
+                : 0.05f;   // Keep slightly above head for others (Drum/Xylo)
+                
+            return new Vector3(b.center.x, b.max.y + offset, b.center.z);
+        }
+        return member.transform.position + Vector3.up * 0.6f;
+    }
+
     private void DrawResultsScreen()
     {
         var ctrl = RhythmGameController.Instance;

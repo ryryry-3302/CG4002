@@ -371,9 +371,27 @@ namespace OrchestraMaestro
         /// </summary>
         public ScoringResult JudgeGesture(GestureType performedGesture, OrchestraSection currentSection)
         {
+            return JudgeGestureCandidates(new[] { performedGesture }, currentSection);
+        }
+
+        /// <summary>
+        /// Judge a set of candidate gestures (ranked by confidence) against the rhythm map.
+        /// A cue is accepted if its expected gesture appears in any candidate.
+        /// </summary>
+        public ScoringResult JudgeGestureCandidates(IReadOnlyList<GestureType> candidateGestures, OrchestraSection currentSection)
+        {
             float currentTime = CurrentSongTime;
             RhythmCue? bestMatch = null;
             float bestOffset = float.MaxValue;
+            int bestRank = int.MaxValue;
+            GestureType matchedGesture = GestureType.UP;
+
+            GestureType primaryGesture = GestureType.UP;
+            bool hasPrimary = candidateGestures != null && candidateGestures.Count > 0;
+            if (hasPrimary)
+            {
+                primaryGesture = candidateGestures[0];
+            }
 
             // Find the closest matching cue within the timing window
             for (int i = nextCueIndex; i < cues.Count; i++)
@@ -391,17 +409,21 @@ namespace OrchestraMaestro
                     continue; // Past cues beyond window
                 }
 
-                // Check gesture type match
-                if (cue.gestureType != performedGesture) continue;
+                // Check gesture type match against any candidate
+                int rank = GetGestureRank(candidateGestures, cue.gestureType);
+                if (rank < 0) continue;
 
                 // Check section match (if cue specifies a section)
                 if (cue.targetSection.HasValue && cue.targetSection.Value != currentSection) continue;
 
                 // Found a valid match - check if it's the best
-                if (cueAbsOffset < Mathf.Abs(bestOffset))
+                if (cueAbsOffset < Mathf.Abs(bestOffset) ||
+                    (Mathf.Approximately(cueAbsOffset, Mathf.Abs(bestOffset)) && rank < bestRank))
                 {
                     bestMatch = cue;
                     bestOffset = offset;
+                    bestRank = rank;
+                    matchedGesture = cue.gestureType;
                 }
             }
 
@@ -415,7 +437,7 @@ namespace OrchestraMaestro
                     scoreAwarded = 0,
                     targetSection = currentSection,
                     matchedCue = null,
-                    gestureType = performedGesture
+                    gestureType = primaryGesture
                 };
             }
 
@@ -452,8 +474,23 @@ namespace OrchestraMaestro
                 scoreAwarded = ScoringResult.GetScoreForJudgement(judgement),
                 targetSection = bestMatch.Value.targetSection ?? currentSection,
                 matchedCue = bestMatch,
-                gestureType = performedGesture
+                gestureType = matchedGesture
             };
+        }
+
+        private static int GetGestureRank(IReadOnlyList<GestureType> gestures, GestureType expected)
+        {
+            if (gestures == null) return -1;
+
+            for (int i = 0; i < gestures.Count; i++)
+            {
+                if (gestures[i] == expected)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         #endregion

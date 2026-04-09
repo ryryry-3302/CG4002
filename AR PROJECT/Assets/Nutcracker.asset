@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4670f837dfb59383fac74e7b4c378306, type: 3}
+  m_Name: Nutcracker
+  m_EditorClassIdentifier: 
+  songName: Nutcracker
+  artistName: Arabian Dance
+  audioClip: {fileID: 8300000, guid: cc6454a52e9c0db27a631c80cdc42af0, type: 3}
+  bpm: 89.1
+  offset: 0.093
+  rhythmMapJson: {fileID: 4900000, guid: e806881c25c51178b86a8348c14038a1, type: 3}

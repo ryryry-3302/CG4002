@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 /// <summary>
 /// Core type definitions for Orchestra Maestro conducting game.
@@ -87,6 +88,12 @@ namespace OrchestraMaestro
         public bool isClenched;
         public long timestamp;
         public float confidence;
+        private string[] runtimeTop3Labels;
+
+        public void SetTop3Labels(string[] labels)
+        {
+            runtimeTop3Labels = labels;
+        }
 
         public void Normalize()
         {
@@ -94,7 +101,7 @@ namespace OrchestraMaestro
             {
                 gestureId = inference switch
                 {
-                    "0" => "IDLE",
+                    "0" => "ERROR",
                     "1" => "UP",
                     "2" => "DOWN",
                     "3" => "LEFT",
@@ -113,12 +120,63 @@ namespace OrchestraMaestro
             }
         }
 
-        /// <summary>Parse gestureId string to GestureType enum</summary>
-        public GestureType GetGestureType()
+        public GestureType[] GetCandidateGestureTypes()
         {
-            if (string.IsNullOrEmpty(gestureId)) return GestureType.UP;
-            return gestureId.ToUpper() switch
+            var candidates = new List<GestureType>(3);
+
+            AddCandidateFromToken(gestureId, candidates);
+
+            if (!string.IsNullOrEmpty(inference))
             {
+                AddCandidateFromToken(inference, candidates);
+            }
+
+            if (runtimeTop3Labels != null)
+            {
+                for (int i = 0; i < runtimeTop3Labels.Length; i++)
+                {
+                    AddCandidateFromToken(runtimeTop3Labels[i], candidates);
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                candidates.Add(GestureType.UP);
+            }
+
+            return candidates.ToArray();
+        }
+
+        private static void AddCandidateFromToken(string token, List<GestureType> candidates)
+        {
+            if (string.IsNullOrWhiteSpace(token)) return;
+
+            if (!TryParseGestureToken(token, out var parsed)) return;
+            if (parsed == GestureType.ERROR) return;
+            if (candidates.Contains(parsed)) return;
+
+            candidates.Add(parsed);
+        }
+
+        private static bool TryParseGestureToken(string token, out GestureType gesture)
+        {
+            string normalized = token.Trim().ToUpperInvariant();
+
+            gesture = normalized switch
+            {
+                "0" => GestureType.ERROR,
+                "1" => GestureType.UP,
+                "2" => GestureType.DOWN,
+                "3" => GestureType.LEFT,
+                "4" => GestureType.RIGHT,
+                "5" => GestureType.PUNCH,
+                "6" => GestureType.WITHDRAW,
+                "7" => GestureType.W_SHAPE,
+                "8" => GestureType.HOURGLASS_SHAPE,
+                "9" => GestureType.LIGHTNING_BOLT_SHAPE,
+                "10" => GestureType.TRIPLE_CLOCKWISE_CIRCLE,
+                "ERROR" => GestureType.ERROR,
+                "IDLE" => GestureType.ERROR,
                 "UP" => GestureType.UP,
                 "DOWN" => GestureType.DOWN,
                 "LEFT" => GestureType.LEFT,
@@ -126,11 +184,29 @@ namespace OrchestraMaestro
                 "PUNCH" => GestureType.PUNCH,
                 "WITHDRAW" => GestureType.WITHDRAW,
                 "W_SHAPE" => GestureType.W_SHAPE,
+                "HOURGLASS" => GestureType.HOURGLASS_SHAPE,
                 "HOURGLASS_SHAPE" => GestureType.HOURGLASS_SHAPE,
+                "LIGHTNING_BOLT" => GestureType.LIGHTNING_BOLT_SHAPE,
                 "LIGHTNING_BOLT_SHAPE" => GestureType.LIGHTNING_BOLT_SHAPE,
+                "MULTICIRCLE" => GestureType.TRIPLE_CLOCKWISE_CIRCLE,
                 "TRIPLE_CLOCKWISE_CIRCLE" => GestureType.TRIPLE_CLOCKWISE_CIRCLE,
-                _ => GestureType.UP // Default fallback
+                _ => GestureType.UP
             };
+
+            if (gesture == GestureType.UP)
+            {
+                return normalized == "1" || normalized == "UP";
+            }
+
+            return true;
+        }
+
+        /// <summary>Parse gestureId string to GestureType enum</summary>
+        public GestureType GetGestureType()
+        {
+            var candidates = GetCandidateGestureTypes();
+            if (candidates.Length == 0) return GestureType.UP;
+            return candidates[0];
         }
     }
 

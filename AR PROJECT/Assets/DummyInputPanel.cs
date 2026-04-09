@@ -126,9 +126,9 @@ namespace OrchestraMaestro
             {
                 SimulateGesture("LEFT");
             }
-            if (GUILayout.Button("👊 PUNCH", GUILayout.Width(buttonWidth), GUILayout.Height(buttonHeight)))
+            if (GUILayout.Button("G", GUILayout.Width(buttonWidth), GUILayout.Height(buttonHeight)))
             {
-                SimulateGesture("PUNCH");
+                SimulateCurrentRequestedGesture();
             }
             if (GUILayout.Button("→ RIGHT", GUILayout.Width(buttonWidth), GUILayout.Height(buttonHeight)))
             {
@@ -191,6 +191,34 @@ namespace OrchestraMaestro
             else
             {
                 Debug.LogWarning("[DummyInput] MQTTManager not found!");
+            }
+        }
+
+        private void SimulateCurrentRequestedGesture()
+        {
+            // Check tutorial first
+            if (RhythmGameController.Instance != null && RhythmGameController.Instance.TryGetGuidedTutorialCue(out GestureType guidedGesture, out OrchestraSection _))
+            {
+                if (guidedGesture != GestureType.ERROR)
+                {
+                    SimulateGesture(guidedGesture.ToString());
+                    return;
+                }
+            }
+
+            if (CueRadarManager.Instance == null)
+            {
+                Debug.LogWarning("[DummyInput] CueRadarManager not found!");
+                return;
+            }
+
+            if (CueRadarManager.Instance.TryGetCurrentActiveGestureType(out GestureType activeGesture))
+            {
+                SimulateGesture(activeGesture.ToString());
+            }
+            else
+            {
+                Debug.LogWarning("[DummyInput] No active requested gesture right now during tutorial or gameplay.");
             }
         }
     }

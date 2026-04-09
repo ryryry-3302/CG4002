@@ -1,0 +1,76 @@
+{
+  "cues": [
+    {
+      "timestamp": 5.13,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 13.42,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 21.57,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 29.77,
+      "gestureId": "WITHDRAW",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 38.01,
+      "gestureId": "W_SHAPE",
+      "section": "flute"
+    },
+    {
+      "timestamp": 46.23,
+      "gestureId": "HOURGLASS_SHAPE",
+      "section": "drum"
+    },
+    {
+      "timestamp": 91.05,
+      "gestureId": "LIGHTNING_BOLT_SHAPE",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 99.24,
+      "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
+      "section": "xylophone"
+    },
+    {
+      "timestamp": 107.51,
+      "gestureId": "UP",
+      "section": "flute"
+    },
+    {
+      "timestamp": 115.82,
+      "gestureId": "DOWN",
+      "section": "drum"
+    },
+    {
+      "timestamp": 123.97,
+      "gestureId": "PUNCH",
+      "section": "pipe"
+    },
+    {
+      "timestamp": 136.39,
+      "gestureId": "WITHDRAW",
+      "section": "xylophone"
+    }
+  ],
+  "tempoSection": {
+    "start": 55.81,
+    "end": 85.81
+  },
+  "tempoBpm": 89.103,
+  "detectedTempoBpm": 89.103,
+  "suggestedSongOffset": 0.093,
+  "generationConfig": {
+    "minInterval": 8.0,
+    "introNoCueSeconds": 5.0,
+    "bpmOverride": null
+  }
+}
