@@ -130,8 +130,12 @@ public class OrchestraPlacement : MonoBehaviour
         {
             EnsureTutorialDialogController();
             TutorialDialogController.Instance?.Show(
-                "Welcome! Let's set up your orchestra. Tap a plane and select Auto Place for aquick setup.\n\n During the game you will be squeezing your LEFT hand to start a gesture, and releasing to finish it.",
-                () => tutorialStep = 1);
+                "Welcome! OrcheSense is a fun rhythm game to train your ability to control an orchestra. Gestures are captured whilst clenching your left fist. And rhythm is trained through waving the wand",
+                () => {
+                    TutorialDialogController.Instance?.Show(
+                        "Let's set up your orchestra. Please start by scanning your environment by looking around.\n\n After Scanning you can select a yellow polygon to be the surface to place the orchestra using the auto place button.",
+                        () => tutorialStep = 1);
+                });
         }
 
         if (MQTTManager.Instance != null)
@@ -219,6 +223,11 @@ public class OrchestraPlacement : MonoBehaviour
             else if (tempoStart > 0 && t >= tempoEnd && t < tempoEnd + 0.5f && finalTempoScore < 0)
             {
                 finalTempoScore = tempoSamples > 0 ? (totalTempoAccuracy / tempoSamples) * 100f : 0f;
+                if (finalTempoScore > 0)
+                {
+                    int bonus = Mathf.RoundToInt(10f * finalTempoScore); // 1000 * percentage
+                    ctrl.AddBonusScore(bonus);
+                }
             }
         }
 
@@ -1387,7 +1396,7 @@ public class OrchestraPlacement : MonoBehaviour
         if (GameSettings.CurrentMode == GameMode.Tutorial && placedCount >= 4 && tutorialStep == 1)
         {
             EnsureTutorialDialogController();
-            TutorialDialogController.Instance?.Show("Great! Tap START GAME to lock placements and pick a song.");
+            TutorialDialogController.Instance?.Show("You're now ready to begin! Feel free to adjust the positioning of the orchestra.");
             tutorialStep = 2;
         }
         
@@ -1889,8 +1898,8 @@ public class OrchestraPlacement : MonoBehaviour
         var ctrl = RhythmGameController.Instance;
         if (ctrl == null) return;
         
-        float panelW = 200f;
-        float panelH = 300f;
+        float panelW = 220f;
+        float panelH = 340f;
         float centerX = (Screen.width / 3f - panelW) / 2f;
         float centerY = (Screen.height / 3f - panelH) / 2f;
         
@@ -1902,9 +1911,13 @@ public class OrchestraPlacement : MonoBehaviour
         GUILayout.Label(ctrl.TotalScore.ToString("N0"), scoreStyle);
         GUILayout.Space(6);
         
-        GUILayout.Label($"<color=#44FF88>✦ Perfect:</color> {ctrl.PerfectCount}", labelStyle);
-        GUILayout.Label($"<color=#FFEE33>Good:</color> {ctrl.GoodCount}", labelStyle);
-        GUILayout.Label($"<color=#FF5555>Miss:</color> {ctrl.MissCount}", labelStyle);
+        GUILayout.Label($"<color=#44FF88>Perfect Score:</color> {ctrl.PerfectScore}", labelStyle);
+        GUILayout.Label($"<color=#FFEE33>Good Score:</color> {ctrl.GoodScore}", labelStyle);
+        GUILayout.Label($"<color=#FF5555>Misses:</color> {ctrl.MissCount}", labelStyle);
+        
+        GUILayout.Space(6);
+        GUILayout.Label($"<color=#88CCFF>Combo Bonus:</color> {ctrl.ComboBonusScore}", labelStyle);
+        GUILayout.Label($"<color=#FF88FF>Tempo Bonus:</color> {ctrl.TempoBonusScore}", labelStyle);
         GUILayout.Label($"Max Combo: {ctrl.MaxCombo}x", labelStyle);
         
         GUILayout.Space(12);

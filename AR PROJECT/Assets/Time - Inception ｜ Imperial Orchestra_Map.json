@@ -80,11 +80,7 @@
       "gestureId": "TRIPLE_CLOCKWISE_CIRCLE",
       "section": "xylophone"
     },
-    {
-      "timestamp": 170.76,
-      "gestureId": "UP",
-      "section": "flute"
-    },
+
     {
       "timestamp": 178.93,
       "gestureId": "DOWN",

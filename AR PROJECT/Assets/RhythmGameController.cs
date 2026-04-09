@@ -63,6 +63,11 @@ namespace OrchestraMaestro
         private int perfectCount = 0;
         private int goodCount = 0;
         private int missCount = 0;
+        private int perfectScore = 0;
+        private int goodScore = 0;
+        private int timingScore = 0;
+        private int comboBonusScore = 0;
+        private int tempoBonusScore = 0;
 
         // BPM Preview State
         private bool bpmPreviewActive = false;
@@ -85,6 +90,11 @@ namespace OrchestraMaestro
         public int PerfectCount => perfectCount;
         public int GoodCount => goodCount;
         public int MissCount => missCount;
+        public int PerfectScore => perfectScore;
+        public int GoodScore => goodScore;
+        public int TimingScore => timingScore;
+        public int ComboBonusScore => comboBonusScore;
+        public int TempoBonusScore => tempoBonusScore;
 
         /// <summary>Tutorial: wrong gesture hint to display. Cleared when correct or after timeout.</summary>
         public string TutorialWrongGestureHint { get; private set; }
@@ -419,6 +429,17 @@ namespace OrchestraMaestro
             Debug.Log($"[RhythmGameController] State changed to: {newState}");
         }
 
+        public void AddBonusScore(int bonus)
+        {
+            tempoBonusScore += bonus;
+            totalScore += bonus;
+            OnScoreChanged?.Invoke(totalScore, combo);
+            if (hudController != null)
+            {
+                hudController.UpdateScore(totalScore, combo);
+            }
+        }
+
         private void ResetScore()
         {
             totalScore = 0;
@@ -427,6 +448,11 @@ namespace OrchestraMaestro
             perfectCount = 0;
             goodCount = 0;
             missCount = 0;
+            perfectScore = 0;
+            goodScore = 0;
+            timingScore = 0;
+            comboBonusScore = 0;
+            tempoBonusScore = 0;
 
             OnScoreChanged?.Invoke(totalScore, combo);
         }
@@ -1175,10 +1201,12 @@ namespace OrchestraMaestro
                 case JudgementType.Perfect:
                     perfectCount++;
                     combo++;
+                    perfectScore += result.scoreAwarded;
                     break;
                 case JudgementType.Good:
                     goodCount++;
                     combo++;
+                    goodScore += result.scoreAwarded;
                     break;
                 case JudgementType.Miss:
                     missCount++;
@@ -1197,6 +1225,18 @@ namespace OrchestraMaestro
             // Calculate score with combo multiplier
             int comboMultiplier = Mathf.Min(1 + combo / 10, 4); // Max 4x multiplier
             int scoreGained = result.scoreAwarded * comboMultiplier;
+
+            // Optional: calculate a specific timing score breakdown based on accuracy if not missed
+            if (result.judgement != JudgementType.Miss)
+            {
+                float timingAccuracy = Mathf.Clamp01(1f - Mathf.Abs(result.timingOffset) / 1.5f); // Example offset based
+                int tScore = Mathf.RoundToInt(scoreGained * timingAccuracy * 0.1f); // just an example of attributing timing score
+                // Alternatively, if timing is already baked into scoreAwarded perfectly and we want to separate it: 
+            }
+
+            int comboBonusEarned = scoreGained - result.scoreAwarded;
+            comboBonusScore += comboBonusEarned;
+            
             totalScore += scoreGained;
 
             // Notify listeners

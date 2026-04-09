@@ -41,11 +41,6 @@
       "section": "xylophone"
     },
     {
-      "timestamp": 108.07,
-      "gestureId": "UP",
-      "section": "flute"
-    },
-    {
       "timestamp": 116.47,
       "gestureId": "DOWN",
       "section": "drum"

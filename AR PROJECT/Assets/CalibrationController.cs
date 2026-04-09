@@ -253,7 +253,7 @@ namespace OrchestraMaestro
 
         private void InitStyles()
         {
-            if (stylesInitialized) return;
+            if (stylesInitialized && overlayStyle != null && overlayStyle.normal.background != null) return;
             stylesInitialized = true;
 
             // Full-screen overlay (dark transparent)
