@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using System;
 using System.Collections.Generic;
 
 namespace OrchestraMaestro
@@ -93,6 +94,18 @@ public class OrchestraPlacement : MonoBehaviour
     private GUIStyle gesturePromptStyle;
     private bool stylesInitialized = false;
     private Vector2 placementScrollPos;
+    private Vector2 resultsLeaderboardScrollPos;
+
+    private bool showResultsLeaderboard;
+    private bool resultsLeaderboardInitialized;
+    private bool currentRunCanSubmitLeaderboard;
+    private bool currentRunQualifiesForLeaderboard;
+    private bool currentRunSavedToLeaderboard;
+    private int currentRunFinalScore;
+    private string currentRunSongKey;
+    private string currentRunSongName;
+    private string leaderboardNameInput = "PLAYER";
+    private string leaderboardFeedback = "";
 
     // Song list scrolling text (LED-style when label doesn't fit)
     private const float SongScrollSpeed = 35f;   // pixels per second
@@ -1453,7 +1466,7 @@ public class OrchestraPlacement : MonoBehaviour
         selectorHaloInstance.transform.position = haloPos + Vector3.down * 0.01f;
         selectorHaloInstance.transform.rotation = Quaternion.identity;
         float baseScale = Mathf.Max(selectedMember.transform.localScale.x, selectedMember.transform.localScale.z);
-        float s = baseScale * 0.1f; 
+        float s = baseScale * 0.025f;
         selectorHaloInstance.transform.localScale = new Vector3(s, s, s);
     }
 
@@ -1555,6 +1568,11 @@ public class OrchestraPlacement : MonoBehaviour
     {
         var gameState = RhythmGameController.Instance?.CurrentState 
             ?? RhythmGameController.GameState.Setup;
+
+        if (gameState != RhythmGameController.GameState.Results && resultsLeaderboardInitialized)
+        {
+            ResetResultsLeaderboardState();
+        }
         
         if (gameState == RhythmGameController.GameState.Setup)
         {
@@ -1942,9 +1960,9 @@ public class OrchestraPlacement : MonoBehaviour
         DrawOutlinedLabel(new Rect(10, sh - 58, 160, 18), mqttText, labelStyle, mqttColor);
         labelStyle.fontSize = savedLabelSize2;
 
-        if (GUI.Button(new Rect(10, sh - 35, 70, 22), "✎ Edit", buttonStyle))
+        if (GUI.Button(new Rect(10, sh - 35, 70, 22), "← Exit", buttonStyle))
         {
-            UnlockPlacements();
+            ExitToMainMenu();
         }
     }
 
@@ -2127,10 +2145,20 @@ public class OrchestraPlacement : MonoBehaviour
         if (ctrl == null) return;
         
         bool isTutorial = GameSettings.CurrentMode == GameMode.Tutorial;
-        float panelW = isTutorial ? 260f : 220f;
-        float panelH = isTutorial ? 160f : 340f;
-        float centerX = (Screen.width / 3f - panelW) / 2f;
-        float centerY = (Screen.height / 3f - panelH) / 2f;
+        if (!isTutorial)
+        {
+            EnsureResultsLeaderboardState(ctrl);
+        }
+
+        float sw = Screen.width / 3f;
+        float sh = Screen.height / 3f;
+
+        float panelW = isTutorial ? 260f : (showResultsLeaderboard ? 320f : 240f);
+        float desiredPanelH = isTutorial ? 160f : (showResultsLeaderboard ? 330f : 370f);
+        float panelH = Mathf.Min(desiredPanelH, sh - 12f);
+
+        float centerX = (sw - panelW) / 2f;
+        float centerY = Mathf.Max(6f, (sh - panelH) / 2f);
         
         GUILayout.BeginArea(new Rect(centerX, centerY, panelW, panelH), hudBoxStyle);
         
@@ -2157,39 +2185,157 @@ public class OrchestraPlacement : MonoBehaviour
             GUILayout.Space(10);
             
             GUILayout.Label(ctrl.TotalScore.ToString("N0"), scoreStyle);
-            GUILayout.Space(6);
-            
-            GUILayout.Label($"<color=#44FF88>Perfect Score:</color> {ctrl.PerfectScore}", labelStyle);
-            GUILayout.Label($"<color=#FFEE33>Good Score:</color> {ctrl.GoodScore}", labelStyle);
-            GUILayout.Label($"<color=#FF5555>Misses:</color> {ctrl.MissCount}", labelStyle);
-            
-            GUILayout.Space(6);
-            GUILayout.Label($"<color=#88CCFF>Combo Bonus:</color> {ctrl.ComboBonusScore}", labelStyle);
-            GUILayout.Label($"<color=#FF88FF>Tempo Bonus:</color> {ctrl.TempoBonusScore}", labelStyle);
-            GUILayout.Label($"Max Combo: {ctrl.MaxCombo}x", labelStyle);
-            
-            GUILayout.Space(12);
-            
-            if (GUILayout.Button("▶ PLAY AGAIN", buttonStyle, GUILayout.Height(30)))
-            {
-                ctrl.ReturnToSongSelection();
-            }
-            
-            GUILayout.Space(4);
-            
-            if (GUILayout.Button("✎ Edit Placement", buttonStyle))
-            {
-                UnlockPlacements();
-            }
+            GUILayout.Space(8);
 
-            GUILayout.Space(4);
-            if (GUILayout.Button("← Return to Main Menu", buttonStyle))
+            if (showResultsLeaderboard)
             {
-                ExitToMainMenu();
+                if (GUILayout.Button("🏆 Hide Leaderboards", buttonStyle, GUILayout.Height(30)))
+                {
+                    showResultsLeaderboard = false;
+                }
+
+                GUILayout.Space(8);
+                DrawResultsLeaderboardPanel(ctrl);
+            }
+            else
+            {
+                GUILayout.Space(6);
+                
+                GUILayout.Label($"<color=#44FF88>Perfect Score:</color> {ctrl.PerfectScore}", labelStyle);
+                GUILayout.Label($"<color=#FFEE33>Good Score:</color> {ctrl.GoodScore}", labelStyle);
+                GUILayout.Label($"<color=#FF5555>Misses:</color> {ctrl.MissCount}", labelStyle);
+                
+                GUILayout.Space(6);
+                GUILayout.Label($"<color=#88CCFF>Combo Bonus:</color> {ctrl.ComboBonusScore}", labelStyle);
+                GUILayout.Label($"<color=#FF88FF>Tempo Bonus:</color> {ctrl.TempoBonusScore}", labelStyle);
+                GUILayout.Label($"Max Combo: {ctrl.MaxCombo}x", labelStyle);
+
+                GUILayout.Space(10);
+                if (GUILayout.Button("🏆 View Leaderboards", buttonStyle, GUILayout.Height(30)))
+                {
+                    showResultsLeaderboard = true;
+                }
+                
+                GUILayout.Space(10);
+                
+                if (GUILayout.Button("▶ PLAY AGAIN", buttonStyle, GUILayout.Height(30)))
+                {
+                    ctrl.ReturnToSongSelection();
+                }
+
+                GUILayout.Space(4);
+                if (GUILayout.Button("← Return to Main Menu", buttonStyle))
+                {
+                    ExitToMainMenu();
+                }
             }
         }
         
         GUILayout.EndArea();
+    }
+
+    private void DrawResultsLeaderboardPanel(RhythmGameController ctrl)
+    {
+        if (currentRunCanSubmitLeaderboard && currentRunQualifiesForLeaderboard && !currentRunSavedToLeaderboard)
+        {
+            GUILayout.Label("Enter name (max 6 chars):", labelStyle);
+            string rawInput = GUILayout.TextField(leaderboardNameInput ?? string.Empty, GUILayout.Height(28));
+            string sanitizedInput = LeaderboardService.SanitizePlayerNameInput(rawInput);
+            if (!string.Equals(sanitizedInput, leaderboardNameInput, StringComparison.Ordinal))
+                leaderboardNameInput = sanitizedInput;
+
+            if (GUILayout.Button("💾 Save Score", buttonStyle, GUILayout.Height(30)))
+            {
+                int rank = LeaderboardService.SubmitScore(
+                    currentRunSongKey,
+                    currentRunSongName,
+                    leaderboardNameInput,
+                    ctrl.TotalScore
+                );
+
+                if (rank > 0)
+                {
+                    currentRunSavedToLeaderboard = true;
+                    currentRunQualifiesForLeaderboard = false;
+                    leaderboardFeedback = $"Saved! Rank #{rank}";
+                }
+                else
+                {
+                    leaderboardFeedback = "Score no longer qualifies for Top 10.";
+                }
+            }
+        }
+        else if (!currentRunCanSubmitLeaderboard)
+        {
+            GUILayout.Label("Only Regular mode scores can be saved.", labelStyle);
+        }
+        else if (!currentRunSavedToLeaderboard)
+        {
+            GUILayout.Label("Score did not enter Top 10 for this song.", labelStyle);
+        }
+
+        if (!string.IsNullOrWhiteSpace(leaderboardFeedback))
+        {
+            GUILayout.Label(leaderboardFeedback, labelStyle);
+        }
+
+        List<LeaderboardEntry> entries = LeaderboardService.GetEntries(currentRunSongKey);
+        GUILayout.Space(4);
+        if (entries.Count == 0)
+        {
+            GUILayout.Label("No scores yet.", labelStyle);
+            return;
+        }
+
+        resultsLeaderboardScrollPos = GUILayout.BeginScrollView(resultsLeaderboardScrollPos, GUILayout.Height(160));
+        for (int i = 0; i < entries.Count; i++)
+        {
+            LeaderboardEntry entry = entries[i];
+            string line = $"{(i + 1).ToString().PadLeft(2, '0')}. {entry.playerName.PadRight(6)}  {entry.score.ToString("N0")}";
+            GUILayout.Label(line, labelStyle);
+        }
+        GUILayout.EndScrollView();
+    }
+
+    private void EnsureResultsLeaderboardState(RhythmGameController ctrl)
+    {
+        string songKey = ctrl.CurrentSongLeaderboardKey;
+        string songName = ctrl.CurrentSongDisplayName;
+        int finalScore = ctrl.TotalScore;
+
+        if (resultsLeaderboardInitialized
+            && currentRunFinalScore == finalScore
+            && string.Equals(currentRunSongKey, songKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        resultsLeaderboardInitialized = true;
+        currentRunFinalScore = finalScore;
+        currentRunSongKey = songKey;
+        currentRunSongName = songName;
+        currentRunSavedToLeaderboard = false;
+        currentRunCanSubmitLeaderboard = GameSettings.CurrentMode == GameMode.Regular;
+        currentRunQualifiesForLeaderboard = currentRunCanSubmitLeaderboard
+            && LeaderboardService.QualifiesForTop(songKey, finalScore);
+        leaderboardNameInput = "PLAYER";
+        leaderboardFeedback = string.Empty;
+        resultsLeaderboardScrollPos = Vector2.zero;
+    }
+
+    private void ResetResultsLeaderboardState()
+    {
+        showResultsLeaderboard = false;
+        resultsLeaderboardInitialized = false;
+        currentRunCanSubmitLeaderboard = false;
+        currentRunQualifiesForLeaderboard = false;
+        currentRunSavedToLeaderboard = false;
+        currentRunFinalScore = 0;
+        currentRunSongKey = null;
+        currentRunSongName = null;
+        leaderboardNameInput = "PLAYER";
+        leaderboardFeedback = string.Empty;
+        resultsLeaderboardScrollPos = Vector2.zero;
     }
 }
 

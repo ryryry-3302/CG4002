@@ -13,6 +13,8 @@ namespace OrchestraMaestro
         [SerializeField] private int maxMessages = 15;
         [SerializeField] private int fontSize = 24;
         [SerializeField] private bool showOnStart = false;
+
+        private const bool EnableOverlay = false;
         
         private List<string> logMessages = new List<string>();
         private bool isVisible = true;
@@ -67,6 +69,8 @@ namespace OrchestraMaestro
 
         private void OnGUI()
         {
+            if (!EnableOverlay) return;
+
             // Initialize styles
             if (logStyle == null)
             {

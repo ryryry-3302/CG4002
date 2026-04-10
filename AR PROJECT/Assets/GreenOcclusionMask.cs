@@ -1,4 +1,5 @@
 using UnityEngine;
+using OrchestraMaestro;
 
 /// <summary>
 /// Renders a visual baton mesh aligned with the detected green blob axis.
@@ -102,8 +103,55 @@ public class GreenOcclusionMask : MonoBehaviour
         return mat;
     }
 
+    private Color currentShaftColor = Color.clear;
+    private Color currentTipColor = Color.clear;
+    private Color currentGripColor = Color.clear;
+
+    private void UpdateColors()
+    {
+        int combo = RhythmGameController.Instance != null ? RhythmGameController.Instance.Combo : 0;
+        Color targetShaft = shaftColor;
+        Color targetTip = tipColor;
+        Color targetGrip = gripColor;
+
+        if (combo >= 10)
+        {
+            // 10x+: Deep purple / Magenta
+            targetShaft = new Color(0.6f, 0.2f, 1f);
+            targetTip = new Color(0.9f, 0.4f, 1f);
+            targetGrip = new Color(0.3f, 0.1f, 0.5f);
+        }
+        else if (combo >= 5)
+        {
+            // 5x: Red
+            targetShaft = new Color(0.8f, 0.1f, 0.1f);
+            targetTip = new Color(1f, 0.4f, 0.35f);
+            targetGrip = new Color(0.4f, 0.05f, 0.05f);
+        }
+        else if (combo >= 3)
+        {
+            // 3x: Blue
+            targetShaft = new Color(0.0f, 0.4f, 0.9f);
+            targetTip = new Color(0.3f, 0.9f, 1f);
+            targetGrip = new Color(0.0f, 0.1f, 0.4f);
+        }
+
+        if (currentShaftColor == Color.clear)
+        {
+            currentShaftColor = shaftColor;
+            currentTipColor = tipColor;
+            currentGripColor = gripColor;
+        }
+
+        currentShaftColor = Color.Lerp(currentShaftColor, targetShaft, Time.deltaTime * 5f);
+        currentTipColor = Color.Lerp(currentTipColor, targetTip, Time.deltaTime * 5f);
+        currentGripColor = Color.Lerp(currentGripColor, targetGrip, Time.deltaTime * 5f);
+    }
+
     private void LateUpdate()
     {
+        UpdateColors();
+
         if (batonTracker == null || arCamera == null)
         {
             if (debugLogCooldown <= 0)
@@ -238,22 +286,22 @@ public class GreenOcclusionMask : MonoBehaviour
     private Color GetSegmentColor(float t)
     {
         if (t < gripFraction)
-            return Color.Lerp(gripColor, shaftColor, t / gripFraction);
+            return Color.Lerp(currentGripColor, currentShaftColor, t / gripFraction);
 
         float shaftEnd = 1f - tipFraction;
         if (t < shaftEnd)
         {
             float st = (t - gripFraction) / (shaftEnd - gripFraction);
             Color woodLight = new Color(
-                shaftColor.r * 1.4f,
-                shaftColor.g * 1.3f,
-                shaftColor.b * 1.2f);
+                currentShaftColor.r * 1.4f,
+                currentShaftColor.g * 1.3f,
+                currentShaftColor.b * 1.2f);
             float grain = 0.9f + 0.1f * Mathf.Sin(st * 18f);
-            return Color.Lerp(shaftColor, woodLight, st * 0.3f) * grain;
+            return Color.Lerp(currentShaftColor, woodLight, st * 0.3f) * grain;
         }
 
         float tipT = (t - shaftEnd) / tipFraction;
-        return Color.Lerp(shaftColor, tipColor, tipT);
+        return Color.Lerp(currentShaftColor, currentTipColor, tipT);
     }
 
     private void OnDestroy()

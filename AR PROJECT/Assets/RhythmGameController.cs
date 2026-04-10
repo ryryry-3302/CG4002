@@ -1237,6 +1237,8 @@ namespace OrchestraMaestro
 
         /// <summary>Currently selected/playing song. Null if none.</summary>
         public SongData CurrentSong => currentSong;
+        public string CurrentSongLeaderboardKey => LeaderboardService.GetSongKey(currentSong);
+        public string CurrentSongDisplayName => LeaderboardService.GetSongDisplayName(currentSong);
 
         /// <summary>Skip to 5 seconds before the first cue. Only valid when first cue is at or after 20s and we're before it.</summary>
         public void SkipToFirstCueMinus5()

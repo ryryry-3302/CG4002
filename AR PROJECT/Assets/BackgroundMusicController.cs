@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Plays background music in the StartScreen scene.
@@ -7,6 +8,8 @@ using UnityEngine;
 [RequireComponent(typeof(AudioSource))]
 public class BackgroundMusicController : MonoBehaviour
 {
+    private static BackgroundMusicController instance;
+
     [Header("Background Music")]
     [SerializeField] private AudioClip backgroundMusic;
     [SerializeField] private bool loop = true;
@@ -16,18 +19,65 @@ public class BackgroundMusicController : MonoBehaviour
 
     private void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        DontDestroyOnLoad(gameObject);
+
         audioSource = GetComponent<AudioSource>();
         audioSource.playOnAwake = false;
         audioSource.loop = loop;
     }
 
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+    }
+
     private void Start()
     {
-        if (backgroundMusic != null)
+        ApplyScenePlayback(SceneManager.GetActiveScene().name);
+    }
+
+    private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ApplyScenePlayback(scene.name);
+    }
+
+    private void ApplyScenePlayback(string sceneName)
+    {
+        bool shouldPlay = ShouldPlayInScene(sceneName);
+        if (!shouldPlay)
         {
-            audioSource.clip = backgroundMusic;
-            audioSource.volume = volume;
-            audioSource.Play();
+            if (audioSource.isPlaying)
+                audioSource.Stop();
+            return;
         }
+
+        if (backgroundMusic == null)
+            return;
+
+        if (audioSource.clip != backgroundMusic)
+            audioSource.clip = backgroundMusic;
+
+        audioSource.loop = loop;
+        audioSource.volume = volume;
+
+        if (!audioSource.isPlaying)
+            audioSource.Play();
+    }
+
+    private bool ShouldPlayInScene(string sceneName)
+    {
+        return sceneName == "StartScreen" || sceneName == "LeaderboardScreen";
     }
 }
