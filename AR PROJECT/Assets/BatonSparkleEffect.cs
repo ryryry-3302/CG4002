@@ -19,14 +19,21 @@ public class BatonSparkleEffect : MonoBehaviour
     [SerializeField] private float minEmissionWhenTracking = 8f;
     [SerializeField] private float fadeOutSpeed = 4f;
 
+    [Header("Trail Prefabs (0x, 3x, 5x, 10x)")]
+    [SerializeField] private ParticleSystem defaultTrailPrefab;
+    [SerializeField] private ParticleSystem combo3xTrailPrefab;
+    [SerializeField] private ParticleSystem combo5xTrailPrefab;
+    [SerializeField] private ParticleSystem combo10xTrailPrefab;
+
     private const float FlyingSparkleDuration = 1.2f;
     private const float FlyingSparkleTrailLength = 0.4f;
     private const int ArrivalExplosionCount = 60;
 
-    private ParticleSystem sparkleParticles;
+    private ParticleSystem[] instantiatedTrails;
+    private ParticleSystem.EmissionModule[] emissionModules;
+    private int activeTrailIndex = 0;
+
     private ParticleSystem burstParticles;
-    private ParticleSystem.EmissionModule emissionModule;
-    private ParticleSystem.ColorOverLifetimeModule sparkleColorOverLifetime;
     private Vector3 lastTipPosition;
     private float currentEmissionRate;
     private float movementSpeed;
@@ -55,31 +62,36 @@ public class BatonSparkleEffect : MonoBehaviour
 
     private void EnsureParticleSystem()
     {
-        sparkleParticles = GetComponentInChildren<ParticleSystem>();
-        if (sparkleParticles == null)
-        {
-            var go = new GameObject("BatonSparkles");
-            go.transform.SetParent(transform);
-            go.transform.localPosition = Vector3.zero;
-            go.transform.localRotation = Quaternion.identity;
-            go.transform.localScale = Vector3.one;
-            sparkleParticles = go.AddComponent<ParticleSystem>();
-            ConfigureParticleSystem();
-        }
-        else
-        {
-            ConfigureParticleSystem();
-        }
+        instantiatedTrails = new ParticleSystem[4];
+        emissionModules = new ParticleSystem.EmissionModule[4];
 
-        emissionModule = sparkleParticles.emission;
-        sparkleColorOverLifetime = sparkleParticles.colorOverLifetime;
+        ParticleSystem[] prefabs = new ParticleSystem[] { 
+            defaultTrailPrefab, combo3xTrailPrefab, combo5xTrailPrefab, combo10xTrailPrefab 
+        };
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (prefabs[i] != null)
+            {
+                var trailObj = Instantiate(prefabs[i].gameObject, transform);
+                trailObj.name = $"BatonSparkle_Tier{i}";
+                trailObj.transform.localPosition = Vector3.zero;
+                trailObj.transform.localRotation = Quaternion.identity;
+                
+                instantiatedTrails[i] = trailObj.GetComponent<ParticleSystem>();
+                emissionModules[i] = instantiatedTrails[i].emission;
+                emissionModules[i].enabled = true;
+                emissionModules[i].rateOverTime = 0f;
+                // Leave main simulation settings from prefab
+            }
+        }
 
         // Burst effect system for gesture feedback
-        var burstGo = sparkleParticles.transform.Find("Burst");
+        var burstGo = transform.Find("Burst");
         if (burstGo == null)
         {
             burstGo = new GameObject("Burst").transform;
-            burstGo.SetParent(sparkleParticles.transform);
+            burstGo.SetParent(transform);
             burstGo.localPosition = Vector3.zero;
             burstGo.localRotation = Quaternion.identity;
             burstGo.localScale = Vector3.one;
@@ -124,57 +136,6 @@ public class BatonSparkleEffect : MonoBehaviour
         }
     }
 
-    private void ConfigureParticleSystem()
-    {
-        var main = sparkleParticles.main;
-        main.duration = 1f;
-        main.loop = true;
-        main.startLifetime = 0.4f;
-        main.startSpeed = 0.03f;
-        main.startSize = 0.008f;
-        main.startColor = new Color(1f, 0.95f, 0.8f, 0.9f);
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.gravityModifier = 0.15f;
-        main.maxParticles = 200;
-
-        var emission = sparkleParticles.emission;
-        emission.rateOverTime = baseEmissionRate;
-        emission.enabled = true;
-
-        var shape = sparkleParticles.shape;
-        shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = 0.002f;
-
-        var colorOverLifetime = sparkleParticles.colorOverLifetime;
-        colorOverLifetime.enabled = true;
-        var grad = new Gradient();
-        grad.SetKeys(
-            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.9f, 0.5f), 0.5f), new GradientColorKey(new Color(1f, 0.85f, 0.4f), 1f) },
-            new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
-        colorOverLifetime.color = grad;
-
-        var sizeOverLifetime = sparkleParticles.sizeOverLifetime;
-        sizeOverLifetime.enabled = true;
-        sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(
-            new Keyframe(0f, 1f),
-            new Keyframe(0.5f, 0.8f),
-            new Keyframe(1f, 0f)));
-
-        var noise = sparkleParticles.noise;
-        noise.enabled = true;
-        noise.strength = 0.15f;
-        noise.frequency = 1.5f;
-        noise.scrollSpeed = 0.2f;
-
-        var renderer = sparkleParticles.GetComponent<ParticleSystemRenderer>();
-        if (renderer != null)
-        {
-            renderer.renderMode = ParticleSystemRenderMode.Billboard;
-            var mat = GetDefaultParticleMaterial();
-            if (mat != null) renderer.material = mat;
-        }
-    }
-
     private static Material GetDefaultParticleMaterial()
     {
         var shader = Shader.Find("Particles/Standard Unlit")
@@ -189,7 +150,7 @@ public class BatonSparkleEffect : MonoBehaviour
 
     private void Update()
     {
-        if (batonTracker == null || sparkleParticles == null) return;
+        if (batonTracker == null || instantiatedTrails == null || instantiatedTrails.Length == 0) return;
 
         Vector3 tipPos = batonTracker.TipWorldPosition;
 
@@ -214,20 +175,38 @@ public class BatonSparkleEffect : MonoBehaviour
             currentEmissionRate = Mathf.MoveTowards(currentEmissionRate, 0f, fadeOutSpeed * Time.deltaTime);
         }
 
-        emissionModule.rateOverTime = currentEmissionRate;
-
-        // Update trail color based on combo (3x = blue, 5x = red, 10x+ = purple gradient)
         int combo = RhythmGameController.Instance?.Combo ?? 0;
+        int newTrailIndex = 0;
+        if (combo >= 10) newTrailIndex = 3;
+        else if (combo >= 5) newTrailIndex = 2;
+        else if (combo >= 3) newTrailIndex = 1;
+        
         if (combo != lastComboForTrail)
         {
             lastComboForTrail = combo;
-            ApplyComboTrailColors(combo);
+            activeTrailIndex = newTrailIndex;
         }
 
-        if (currentEmissionRate < 0.5f && sparkleParticles.isPlaying)
-            sparkleParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-        else if (currentEmissionRate >= 0.5f && !sparkleParticles.isPlaying)
-            sparkleParticles.Play();
+        for (int i = 0; i < instantiatedTrails.Length; i++)
+        {
+            ParticleSystem ps = instantiatedTrails[i];
+            if (ps == null) continue;
+
+            if (i == activeTrailIndex)
+            {
+                emissionModules[i].rateOverTime = currentEmissionRate;
+                if (currentEmissionRate >= 0.5f && !ps.isPlaying)
+                    ps.Play();
+                else if (currentEmissionRate < 0.5f && ps.isPlaying)
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            }
+            else
+            {
+                emissionModules[i].rateOverTime = 0f;
+                if (ps.isPlaying)
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            }
+        }
     }
 
     private Color GetFlyingSparkleColor(JudgementType judgement, int combo)
@@ -241,59 +220,6 @@ public class BatonSparkleEffect : MonoBehaviour
         return judgement == JudgementType.Perfect
             ? new Color(1f, 0.9f, 0.4f)
             : new Color(1f, 1f, 0.95f);
-    }
-
-    private void ApplyComboTrailColors(int combo)
-    {
-        if (sparkleParticles == null) return;
-        var main = sparkleParticles.main;
-        var grad = new Gradient();
-        if (combo >= 10)
-        {
-            // 10x+: pretty purple gradient (violet -> magenta -> deep purple)
-            main.startColor = new Color(0.85f, 0.4f, 1f, 0.95f);
-            grad.SetKeys(
-                new[] {
-                    new GradientColorKey(new Color(0.6f, 0.2f, 1f), 0f),
-                    new GradientColorKey(new Color(0.9f, 0.4f, 1f), 0.35f),
-                    new GradientColorKey(new Color(1f, 0.3f, 0.8f), 0.65f),
-                    new GradientColorKey(new Color(0.5f, 0.1f, 0.7f), 1f)
-                },
-                new[] { new GradientAlphaKey(0.95f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
-        }
-        else if (combo >= 5)
-        {
-            // 5x: red
-            main.startColor = new Color(1f, 0.25f, 0.2f, 0.95f);
-            grad.SetKeys(
-                new[] {
-                    new GradientColorKey(new Color(1f, 0.4f, 0.35f), 0f),
-                    new GradientColorKey(new Color(1f, 0.2f, 0.15f), 0.5f),
-                    new GradientColorKey(new Color(0.8f, 0.1f, 0.1f), 1f)
-                },
-                new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
-        }
-        else if (combo >= 3)
-        {
-            // 3x: blue
-            main.startColor = new Color(0.2f, 0.8f, 1f, 0.95f);
-            grad.SetKeys(
-                new[] {
-                    new GradientColorKey(new Color(0.3f, 0.9f, 1f), 0f),
-                    new GradientColorKey(new Color(0.1f, 0.6f, 1f), 0.5f),
-                    new GradientColorKey(new Color(0.0f, 0.4f, 0.9f), 1f)
-                },
-                new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
-        }
-        else
-        {
-            // Default: warm gold/white
-            main.startColor = new Color(1f, 0.95f, 0.8f, 0.9f);
-            grad.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.9f, 0.5f), 0.5f), new GradientColorKey(new Color(1f, 0.85f, 0.4f), 1f) },
-                new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
-        }
-        sparkleColorOverLifetime.color = grad;
     }
 
     private void OnGestureJudged(ScoringResult result)

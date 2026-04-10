@@ -23,7 +23,7 @@ public class BatonTracker : MonoBehaviour
     [SerializeField] private float hueMax = 0.45f;   // ~160°
     [SerializeField] private float saturationMin = 0.45f;  // Relaxed for different lighting
     [SerializeField] private float valueMin = 0.4f;        // Relaxed for different lighting
-    [SerializeField] private int minGreenPixels = 28;
+    [SerializeField] private int minGreenPixels = 16;
     [SerializeField] private float greenDominanceMin = 0.1f;  // G must exceed R and B
 
     [Header("Calibration")]

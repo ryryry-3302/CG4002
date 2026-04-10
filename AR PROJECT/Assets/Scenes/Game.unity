@@ -665,7 +665,6 @@ MonoBehaviour:
   maxMessages: 15
   fontSize: 24
   showOnStart: 0
-  enableOverlay: 0
 --- !u!82 &164925912
 AudioSource:
   m_ObjectHideFlags: 0
@@ -2366,6 +2365,10 @@ MonoBehaviour:
   - {fileID: 2452762725993195741, guid: d568dbd2e15af3bfa8ac16384dde8608, type: 3}
   - {fileID: 2699246951506681812, guid: e8c3008f0c604b681bbc389d8f3a86ab, type: 3}
   prefabSections: 
+  stageMaterial: {fileID: 2100000, guid: c4fe1a6ceb056a74ab62c90ceec32d14, type: 2}
+  stageSize: 2.5
+  stageWidthMultiplier: 1
+  stageDepthMultiplier: 1
   wShapeIcon: {fileID: 2800000, guid: c095bb11338e740feba03b509ff0d3ba, type: 3}
   hourglassIcon: {fileID: 2800000, guid: 49e0418be8b60b6c7988921b8b4f125b, type: 3}
   lightningIcon: {fileID: 2800000, guid: 62c295da81ec0f8e1aa846511083a5fa, type: 3}
@@ -2374,8 +2377,17 @@ MonoBehaviour:
   perfectColor: {r: 0, g: 1, b: 0.5, a: 1}
   goodColor: {r: 1, g: 1, b: 0, a: 1}
   missColor: {r: 1, g: 0.3, b: 0.3, a: 1}
+  lightningPrefabs:
+  - {fileID: 5974657670337761187, guid: 116627569b5b94044894cce6983c5e9f, type: 3}
+  - {fileID: 3122601347285997425, guid: f846812a9a2cb7445b5514cd7bb7e0b3, type: 3}
+  - {fileID: 285656054538791525, guid: dc0dcd1aa86e1e74c94eafd8a4beb5c7, type: 3}
+  - {fileID: 3203405489481484840, guid: 8be38c5f70d323e49a0bb254441a9b9c, type: 3}
+  electroHitPrefab: {fileID: 2965222256817593503, guid: a164e676dbbd6e54587237e619372c98, type: 3}
   highlightIntensity: 2
   feedbackDuration: 0.5
+  crystal3xPrefab: {fileID: 161766660727748596, guid: 05ce920d629922a4eb4795ef7494ce5c, type: 3}
+  crystal5xPrefab: {fileID: 7957833072274404953, guid: 3355f6bfa6db8b24281b827de929694c, type: 3}
+  crystal10xPrefab: {fileID: 614306400986586875, guid: e890b8b7193c2aa6da8ab89d87a4aa79, type: 3}
   prefabScale: 0.035
   selectorHaloPrefab: {fileID: 4932088507883938021, guid: 11e1353e7d76d6631816c38a004d22b1, type: 3}
 --- !u!4 &1141421496
@@ -2994,6 +3006,10 @@ MonoBehaviour:
   movementEmissionScale: 80
   minEmissionWhenTracking: 8
   fadeOutSpeed: 4
+  defaultTrailPrefab: {fileID: 7615663170305950946, guid: 010733280c7cd0b4294a9867b26a13f4, type: 3}
+  combo3xTrailPrefab: {fileID: 8254561054775754492, guid: 14078f8f7064d894fad9a68275c46f31, type: 3}
+  combo5xTrailPrefab: {fileID: 5925117156057431584, guid: 0d3a2dc2176fee345b9d92ac7a089808, type: 3}
+  combo10xTrailPrefab: {fileID: 2271762939967217129, guid: e4a831baccba453479bb744202efc891, type: 3}
 --- !u!114 &1939642338
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3183,6 +3199,10 @@ MonoBehaviour:
   movementEmissionScale: 80
   minEmissionWhenTracking: 8
   fadeOutSpeed: 4
+  defaultTrailPrefab: {fileID: 0}
+  combo3xTrailPrefab: {fileID: 0}
+  combo5xTrailPrefab: {fileID: 0}
+  combo10xTrailPrefab: {fileID: 0}
 --- !u!1 &2044123627
 GameObject:
   m_ObjectHideFlags: 0

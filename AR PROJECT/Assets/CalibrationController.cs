@@ -112,7 +112,7 @@ namespace OrchestraMaestro
             // Status text
             bool testMode = MQTTManager.Instance == null || !MQTTManager.Instance.IsConnected;
             string statusText = testMode 
-                ? "TEST MODE - UI Only (MQTT disconnected)" 
+                ? "TEST MODE - UI Only (Controller disconnected)" 
                 : "Calibrating flex sensor...";
             GUILayout.Label(statusText, statusStyle);
 

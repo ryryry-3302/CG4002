@@ -22,6 +22,16 @@ public class OrchestraPlacement : MonoBehaviour
     [Tooltip("Which section each prefab belongs to (same order as prefabs)")]
     [SerializeField] private OrchestraSection[] prefabSections;
     
+    [Header("Stage Settings")]
+    [Tooltip("The material to use for the shared stage floor")]
+    [SerializeField] private Material stageMaterial;
+    [Tooltip("Multiplier for auto-fitted stage size (1.0 = exact footprint)")]
+    [SerializeField] private float stageSize = 1.05f;
+    [Tooltip("Extra width multiplier for the ellipse (X axis)")]
+    [SerializeField] private float stageWidthMultiplier = 1.25f;
+    [Tooltip("Extra depth multiplier for the ellipse (Z axis)")]
+    [SerializeField] private float stageDepthMultiplier = 0.8f;
+
     [Header("Complex Gesture HUD Icons")]
     [SerializeField] private Texture2D wShapeIcon;
     [SerializeField] private Texture2D hourglassIcon;
@@ -33,8 +43,18 @@ public class OrchestraPlacement : MonoBehaviour
     [SerializeField] private Color perfectColor = new Color(0f, 1f, 0.5f, 1f);   // Green
     [SerializeField] private Color goodColor = new Color(1f, 1f, 0f, 1f);        // Yellow
     [SerializeField] private Color missColor = new Color(1f, 0.3f, 0.3f, 1f);    // Red
+    [SerializeField] private GameObject[] lightningPrefabs;
+    [SerializeField] private GameObject electroHitPrefab;
     [SerializeField] private float highlightIntensity = 2f;
     [SerializeField] private float feedbackDuration = 0.5f;
+    
+    [Header("Combo Crystal Effects")]
+    [SerializeField] private GameObject crystal3xPrefab;
+    [SerializeField] private GameObject crystal5xPrefab;
+    [SerializeField] private GameObject crystal10xPrefab;
+
+    private int lastProcessedCombo = 0;
+    private GameObject activeCombocrystalEffect;
     
     [Header("Settings")]
     [SerializeField] private float prefabScale = 0.5f;
@@ -58,6 +78,13 @@ public class OrchestraPlacement : MonoBehaviour
 
     // Tutorial dialog steps (only in Tutorial mode)
     private int tutorialStep = 0;
+
+    // Keep all placements on a single detected AR plane
+    private bool hasLockedPlacementPlane = false;
+    private TrackableId lockedPlacementPlaneId;
+    private GameObject sharedStageEllipse;
+
+    private const int SharedStageEllipseSegments = 64;
 
     // Auto-place: trigger once when planes detected
     private bool autoPlaceTriggered;
@@ -275,6 +302,8 @@ public class OrchestraPlacement : MonoBehaviour
             }
         }
 
+        UpdateComboCrystals();
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         // Simulate BPM input without MQTT server
         if (Input.GetKey(KeyCode.UpArrow))
@@ -294,6 +323,60 @@ public class OrchestraPlacement : MonoBehaviour
             Vector2? tapPos = GetPlacementTapPosition();
             if (tapPos.HasValue && !GetPlacementPanelScreenRect().Contains(tapPos.Value))
                 TryPlaceObject(tapPos.Value);
+        }
+    }
+
+    private void UpdateComboCrystals()
+    {
+        if (RhythmGameController.Instance == null) return;
+        int currentCombo = RhythmGameController.Instance.Combo;
+
+        // Has combo been lost or decreased below threshold?
+        if (currentCombo < 3)
+        {
+            if (activeCombocrystalEffect != null)
+                Destroy(activeCombocrystalEffect);
+            lastProcessedCombo = currentCombo;
+            return;
+        }
+
+        // Did we hit a new threshold?
+        if (currentCombo >= 10 && lastProcessedCombo < 10)
+        {
+            SpawnComboCrystal(crystal10xPrefab);
+        }
+        else if (currentCombo >= 5 && currentCombo < 10 && lastProcessedCombo < 5)
+        {
+            SpawnComboCrystal(crystal5xPrefab);
+        }
+        else if (currentCombo >= 3 && currentCombo < 5 && lastProcessedCombo < 3)
+        {
+            SpawnComboCrystal(crystal3xPrefab);
+        }
+
+        lastProcessedCombo = currentCombo;
+    }
+
+    private void SpawnComboCrystal(GameObject prefab)
+    {
+        if (activeCombocrystalEffect != null)
+            Destroy(activeCombocrystalEffect);
+
+        if (prefab != null && sharedStageEllipse != null && sharedStageEllipse.activeSelf)
+        {
+            // Spawn at center of the stage map/ellipse
+            activeCombocrystalEffect = Instantiate(prefab, sharedStageEllipse.transform.position, Quaternion.identity);
+            
+            // Constrain size to the stage
+            activeCombocrystalEffect.transform.localScale = prefab.transform.localScale * 0.3f;
+
+            // Adjust height if necessary, e.g. move it to the ground plane or slightly float
+            Vector3 pos = activeCombocrystalEffect.transform.position;
+            pos.y += 0.05f; 
+            activeCombocrystalEffect.transform.position = pos;
+
+            // Effect should die after 4s
+            Destroy(activeCombocrystalEffect, 4f);
         }
     }
 
@@ -328,11 +411,52 @@ public class OrchestraPlacement : MonoBehaviour
     
     void TryPlaceObject(Vector2 screenPosition)
     {
-        if (raycastManager.Raycast(screenPosition, hits, TrackableType.PlaneWithinPolygon))
+        if (TryGetPlacementHit(screenPosition, out ARRaycastHit selectedHit))
         {
-            Pose hitPose = hits[0].pose;
+            Pose hitPose = selectedHit.pose;
             PlaceOrchestraMember(hitPose.position, hitPose.rotation);
         }
+    }
+
+    private bool TryGetPlacementHit(Vector2 screenPosition, out ARRaycastHit selectedHit)
+    {
+        selectedHit = default;
+        if (!raycastManager.Raycast(screenPosition, hits, TrackableType.PlaneWithinPolygon) || hits.Count == 0)
+            return false;
+
+        if (!hasLockedPlacementPlane)
+        {
+            selectedHit = hits[0];
+            hasLockedPlacementPlane = true;
+            lockedPlacementPlaneId = selectedHit.trackableId;
+            return true;
+        }
+
+        for (int i = 0; i < hits.Count; i++)
+        {
+            if (hits[i].trackableId == lockedPlacementPlaneId)
+            {
+                selectedHit = hits[i];
+                return true;
+            }
+        }
+
+        Debug.Log("[OrchestraPlacement] Placement is locked to the first selected plane. Tap that same surface.");
+        return false;
+    }
+
+    private Vector3 ProjectPointToLockedPlane(Vector3 worldPoint)
+    {
+        if (!hasLockedPlacementPlane || planeManager == null)
+            return worldPoint;
+
+        ARPlane plane = planeManager.GetPlane(lockedPlacementPlaneId);
+        if (plane == null)
+            return worldPoint;
+
+        Plane infinitePlane = new Plane(plane.transform.up, plane.transform.position);
+        float distance = infinitePlane.GetDistanceToPoint(worldPoint);
+        return worldPoint - plane.transform.up * distance;
     }
 
     void PlaceOrchestraMember(Vector3 position, Quaternion rotation)
@@ -376,7 +500,7 @@ public class OrchestraPlacement : MonoBehaviour
         // Correct for off-center mesh geometry in FBX models:
         // Calculate the visual center offset from the renderers' bounds and shift the object
         // so the visual center aligns with the tap position
-        Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+        Renderer[] renderers = System.Array.FindAll(member.GetComponentsInChildren<Renderer>(), r => r.gameObject.name != "StageGround");
         if (renderers.Length > 0)
         {
             Bounds combinedBounds = renderers[0].bounds;
@@ -398,6 +522,7 @@ public class OrchestraPlacement : MonoBehaviour
         
         // Store original colors for highlighting
         CacheOriginalColors(member);
+        UpdateSharedStageEllipse();
         
         Debug.Log($"Placed {prefab.name} at {member.transform.position} (hit: {position}) in section {section}");
     }
@@ -441,13 +566,13 @@ public class OrchestraPlacement : MonoBehaviour
         }
 
         Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        if (!raycastManager.Raycast(screenCenter, hits, TrackableType.PlaneWithinPolygon))
+        if (!TryGetPlacementHit(screenCenter, out ARRaycastHit selectedHit))
         {
             Debug.LogWarning("[OrchestraPlacement] Auto place: no plane detected. Point at a surface or resume scanning.");
             return;
         }
 
-        Pose hitPose = hits[0].pose;
+        Pose hitPose = selectedHit.pose;
         Vector3 camPos = cam.transform.position;
         float hitDist = Vector3.Distance(camPos, hitPose.position);
         float useDist = Mathf.Max(hitDist, AutoPlaceDistance);
@@ -467,6 +592,7 @@ public class OrchestraPlacement : MonoBehaviour
             if (orchestraPrefabs[prefabIdx] == null) continue;
 
             Vector3 pos = center + right * (offsets[i] * AutoPlaceSpacing);
+            pos = ProjectPointToLockedPlane(pos);
             Quaternion rot = Quaternion.LookRotation(Vector3.ProjectOnPlane(pos - camPos, Vector3.up));
             PlaceOrchestraMemberAt(pos, rot, section, prefabIdx);
         }
@@ -503,6 +629,8 @@ public class OrchestraPlacement : MonoBehaviour
 
         foreach (var m in placedMembers)
             m.transform.position += dir * step;
+
+        UpdateSharedStageEllipse();
     }
 
     /// <summary>Raise all placed orchestra members (world Y up)</summary>
@@ -522,6 +650,8 @@ public class OrchestraPlacement : MonoBehaviour
         if (placedMembers.Count == 0) return;
         foreach (var m in placedMembers)
             m.transform.position += Vector3.up * step;
+
+        UpdateSharedStageEllipse();
     }
 
     private void PlaceOrchestraMemberAt(Vector3 position, Quaternion rotation, OrchestraSection section, int prefabIndex)
@@ -533,7 +663,7 @@ public class OrchestraPlacement : MonoBehaviour
         GameObject member = Instantiate(prefab, position, finalRotation);
         member.transform.localScale = prefab.transform.localScale * 0.6f;
 
-        Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+        Renderer[] renderers = System.Array.FindAll(member.GetComponentsInChildren<Renderer>(), r => r.gameObject.name != "StageGround");
         if (renderers.Length > 0)
         {
             Bounds combinedBounds = renderers[0].bounds;
@@ -544,14 +674,148 @@ public class OrchestraPlacement : MonoBehaviour
             correction.y = 0f;
             member.transform.position += correction;
         }
-
         placedMembers.Add(member);
         sectionMembers[(int)section].Add(member);
         sectionPlacedMember[section] = member;
         memberToSection[member] = section;
         CacheOriginalColors(member);
+        UpdateSharedStageEllipse();
     }
-    
+
+    private void EnsureSharedStageEllipse()
+    {
+        if (sharedStageEllipse != null) return;
+
+        sharedStageEllipse = new GameObject("StageGroundEllipse");
+        MeshFilter meshFilter = sharedStageEllipse.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = sharedStageEllipse.AddComponent<MeshRenderer>();
+
+        meshFilter.sharedMesh = BuildUnitEllipseMesh();
+        if (stageMaterial != null)
+            meshRenderer.material = stageMaterial;
+
+        meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        meshRenderer.receiveShadows = true;
+    }
+
+    private Mesh BuildUnitEllipseMesh()
+    {
+        Mesh mesh = new Mesh();
+        mesh.name = "StageGroundEllipseMesh";
+
+        Vector3[] vertices = new Vector3[SharedStageEllipseSegments + 1];
+        Vector2[] uvs = new Vector2[SharedStageEllipseSegments + 1];
+        int[] triangles = new int[SharedStageEllipseSegments * 3];
+
+        vertices[0] = Vector3.zero;
+        uvs[0] = new Vector2(0.5f, 0.5f);
+
+        for (int i = 0; i < SharedStageEllipseSegments; i++)
+        {
+            float t = (i / (float)SharedStageEllipseSegments) * Mathf.PI * 2f;
+            float x = Mathf.Cos(t) * 0.5f;
+            float z = Mathf.Sin(t) * 0.5f;
+            vertices[i + 1] = new Vector3(x, 0f, z);
+            uvs[i + 1] = new Vector2(x + 0.5f, z + 0.5f);
+        }
+
+        for (int i = 0; i < SharedStageEllipseSegments; i++)
+        {
+            int tri = i * 3;
+            int curr = i + 1;
+            int next = (i == SharedStageEllipseSegments - 1) ? 1 : i + 2;
+            triangles[tri] = 0;
+            triangles[tri + 1] = next;
+            triangles[tri + 2] = curr;
+        }
+
+        mesh.vertices = vertices;
+        mesh.uv = uvs;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    private void UpdateSharedStageEllipse()
+    {
+        if (stageMaterial == null || placedMembers.Count == 0)
+        {
+            if (sharedStageEllipse != null)
+                sharedStageEllipse.SetActive(false);
+            return;
+        }
+
+        EnsureSharedStageEllipse();
+        if (sharedStageEllipse == null) return;
+
+        MeshRenderer meshRenderer = sharedStageEllipse.GetComponent<MeshRenderer>();
+        if (meshRenderer != null)
+        {
+            if (stageMaterial != null && meshRenderer.sharedMaterial != stageMaterial)
+                meshRenderer.sharedMaterial = stageMaterial;
+        }
+
+        bool foundAnyRenderer = false;
+        Bounds combinedBounds = default;
+        float minAlongPlaneNormal = float.MaxValue;
+
+        Vector3 planeNormal = Vector3.up;
+        if (hasLockedPlacementPlane && planeManager != null)
+        {
+            ARPlane plane = planeManager.GetPlane(lockedPlacementPlaneId);
+            if (plane != null)
+                planeNormal = plane.transform.up;
+        }
+        planeNormal.Normalize();
+
+        Vector3 absPlaneNormal = new Vector3(Mathf.Abs(planeNormal.x), Mathf.Abs(planeNormal.y), Mathf.Abs(planeNormal.z));
+
+        foreach (var member in placedMembers)
+        {
+            if (member == null) continue;
+            Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null) continue;
+                if (!foundAnyRenderer)
+                {
+                    combinedBounds = renderer.bounds;
+                    foundAnyRenderer = true;
+                }
+                else
+                {
+                    combinedBounds.Encapsulate(renderer.bounds);
+                }
+
+                Vector3 rendererCenter = renderer.bounds.center;
+                Vector3 extents = renderer.bounds.extents;
+                float projectedExtent = Vector3.Dot(absPlaneNormal, extents);
+                float rendererMinAlongNormal = Vector3.Dot(planeNormal, rendererCenter) - projectedExtent;
+                if (rendererMinAlongNormal < minAlongPlaneNormal)
+                    minAlongPlaneNormal = rendererMinAlongNormal;
+            }
+        }
+
+        if (!foundAnyRenderer)
+        {
+            sharedStageEllipse.SetActive(false);
+            return;
+        }
+
+        Vector3 center = combinedBounds.center;
+        float centerAlongNormal = Vector3.Dot(planeNormal, center);
+        center += planeNormal * (minAlongPlaneNormal - centerAlongNormal);
+
+        float ellipseX = Mathf.Max(0.1f, combinedBounds.size.x * stageSize * stageWidthMultiplier);
+        float ellipseZ = Mathf.Max(0.1f, combinedBounds.size.z * stageSize * stageDepthMultiplier);
+
+        sharedStageEllipse.transform.position = center + planeNormal * 0.005f;
+        sharedStageEllipse.transform.rotation = Quaternion.FromToRotation(Vector3.up, planeNormal);
+        sharedStageEllipse.transform.localScale = new Vector3(ellipseX, 1f, ellipseZ);
+        sharedStageEllipse.SetActive(true);
+    }
+
     /// <summary>Cache original material colors for later restoration</summary>
     private void CacheOriginalColors(GameObject member)
     {
@@ -602,6 +866,7 @@ public class OrchestraPlacement : MonoBehaviour
                 originalColors.Remove(r);
             
             Destroy(last);
+            UpdateSharedStageEllipse();
         }
     }
 
@@ -620,6 +885,10 @@ public class OrchestraPlacement : MonoBehaviour
         sectionPlacedMember.Clear();
         memberToSection.Clear();
         originalColors.Clear();
+        hasLockedPlacementPlane = false;
+
+        if (sharedStageEllipse != null)
+            sharedStageEllipse.SetActive(false);
     }
 
     public void TogglePlaneVisibility()
@@ -853,6 +1122,21 @@ public class OrchestraPlacement : MonoBehaviour
             OrchestraSection section = result.targetSection;
             if (sectionPlacedMember.TryGetValue(section, out GameObject member) && member != null)
             {
+                if (result.gestureType == GestureType.LIGHTNING_BOLT_SHAPE && lightningPrefabs != null && lightningPrefabs.Length > 0)
+                {
+                    GameObject lightning = Instantiate(lightningPrefabs[UnityEngine.Random.Range(0, lightningPrefabs.Length)], member.transform.position, Quaternion.identity);
+                    lightning.transform.localScale = Vector3.one * 2f; // Scale up to potentially cover character
+                    Destroy(lightning, 2f);
+
+                    if (electroHitPrefab != null)
+                    {
+                        // Spawn electro hit at the center of the character
+                        Vector3 centerPos = member.transform.position + Vector3.up * 1f;
+                        GameObject electroHit = Instantiate(electroHitPrefab, centerPos, Quaternion.identity);
+                        Destroy(electroHit, 2f);
+                    }
+                }
+
                 if (activeEffects.TryGetValue(section, out Coroutine existing))
                 {
                     if (existing != null) StopCoroutine(existing);
@@ -1246,7 +1530,7 @@ public class OrchestraPlacement : MonoBehaviour
             {
                 // Use the visual center (renderer bounds) instead of the raw transform position
                 // This accounts for FBX models whose mesh geometry is offset from the transform origin
-                Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+                Renderer[] renderers = System.Array.FindAll(member.GetComponentsInChildren<Renderer>(), r => r.gameObject.name != "StageGround");
                 if (renderers.Length > 0)
                 {
                     Bounds combinedBounds = renderers[0].bounds;
@@ -1285,7 +1569,7 @@ public class OrchestraPlacement : MonoBehaviour
         {
             if (member != null)
             {
-                Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+                Renderer[] renderers = System.Array.FindAll(member.GetComponentsInChildren<Renderer>(), r => r.gameObject.name != "StageGround");
                 if (renderers.Length > 0)
                 {
                     Bounds combinedBounds = renderers[0].bounds;
@@ -1454,7 +1738,7 @@ public class OrchestraPlacement : MonoBehaviour
         }
         selectorHaloInstance.SetActive(true);
         // Use renderer bounds center for robust centering (like radar)
-        Renderer[] renderers = selectedMember.GetComponentsInChildren<Renderer>();
+        Renderer[] renderers = System.Array.FindAll(selectedMember.GetComponentsInChildren<Renderer>(), r => r.gameObject.name != "StageGround");
         Vector3 haloPos = selectedMember.transform.position;
         if (renderers.Length > 0) {
             Bounds combinedBounds = renderers[0].bounds;
@@ -1951,9 +2235,9 @@ public class OrchestraPlacement : MonoBehaviour
             labelStyle.fontSize = savedSize;
         }
 
-        // ── Bottom-left: MQTT indicator + edit button ──
+        // ── Bottom-left: Controller indicator + edit button ──
         bool mqttConnected = GameSettings.TestMode || (MQTTManager.Instance != null && MQTTManager.Instance.IsConnected);
-        string mqttText = GameSettings.TestMode ? "MQTT: Connected (Test)" : (mqttConnected ? "MQTT: Connected" : "MQTT: Disconnected");
+        string mqttText = GameSettings.TestMode ? "Controller: Connected (Test)" : (mqttConnected ? "Controller: Connected" : "Controller: Disconnected");
         Color mqttColor = mqttConnected ? new Color(0.2f, 1f, 0.3f) : new Color(1f, 0.3f, 0.2f);
         int savedLabelSize2 = labelStyle.fontSize;
         labelStyle.fontSize = 11;
