@@ -65,6 +65,7 @@ public class OrchestraPlacement : MonoBehaviour
     // Section animation: play for this long after a correct cue (seconds)
     private const float SectionPlayDuration = 10f;
     private Dictionary<OrchestraSection, float> sectionAnimationEndTime = new Dictionary<OrchestraSection, float>();
+    private Dictionary<OrchestraSection, Coroutine> activeEffects = new Dictionary<OrchestraSection, Coroutine>();
     
     // BPM feedback
     private float currentStickBpm = 0f;
@@ -266,28 +267,6 @@ public class OrchestraPlacement : MonoBehaviour
         currentStickBpm = Mathf.Max(0, currentStickBpm);
 #endif
 
-        // When in game: stop section animations after SectionPlayDuration
-        if (!isPlacementMode && sectionAnimationEndTime.Count > 0)
-        {
-            float now = Time.time;
-            var toRemove = new List<OrchestraSection>();
-            foreach (var kv in sectionAnimationEndTime)
-            {
-                if (now >= kv.Value)
-                {
-                    toRemove.Add(kv.Key);
-                    if (sectionPlacedMember.TryGetValue(kv.Key, out GameObject member) && member != null)
-                    {
-                        var anim = member.GetComponent<Animator>();
-                        if (anim != null)
-                            anim.speed = 0f;
-                    }
-                }
-            }
-            foreach (var sec in toRemove)
-                sectionAnimationEndTime.Remove(sec);
-        }
-        
         if (!isPlacementMode) return;
 
         // Manual placement: handle tap to place when AutoPlace is off
@@ -733,8 +712,8 @@ public class OrchestraPlacement : MonoBehaviour
         // Subscribe to game events for HUD
         Invoke(nameof(SubscribeGameHUD), 0.2f);
         
-        // Make characters static until a correct cue triggers their animation
-        SetAllSectionAnimatorsSpeed(0f);
+        // Make characters consistently animate initially
+        SetAllSectionAnimatorsSpeed(1f);
 
         if (GameSettings.CurrentMode == GameMode.Tutorial)
         {
@@ -825,23 +804,132 @@ public class OrchestraPlacement : MonoBehaviour
                 break;
         }
 
-        // Play this section's character animation for SectionPlayDuration on Perfect/Good
+        // Apply random gesture effect for 4s on Perfect/Good
         if (result.judgement == JudgementType.Perfect || result.judgement == JudgementType.Good)
         {
             OrchestraSection section = result.targetSection;
-            sectionAnimationEndTime[section] = Time.time + SectionPlayDuration;
             if (sectionPlacedMember.TryGetValue(section, out GameObject member) && member != null)
             {
-                var anim = member.GetComponent<Animator>();
-                if (anim != null)
-                    anim.speed = 1f;
+                if (activeEffects.TryGetValue(section, out Coroutine existing))
+                {
+                    if (existing != null) StopCoroutine(existing);
+                }
+                activeEffects[section] = StartCoroutine(HandleGestureEffectCoroutine(section, member));
             }
         }
     }
 
+    private System.Collections.IEnumerator HandleGestureEffectCoroutine(OrchestraSection section, GameObject member)
+    {
+        ClearEffects(member);
+        
+        var anim = member.GetComponent<Animator>();
+        int effectType = UnityEngine.Random.Range(0, 3); // 0 = Fast, 1 = Slow, 2 = Rainbow Glow
+        
+        // Apply effect
+        bool isRainbow = false;
+        switch (effectType)
+        {
+            case 0:
+                if (anim != null) anim.speed = 2f;
+                break;
+            case 1:
+                if (anim != null) anim.speed = 0.5f;
+                break;
+            case 2:
+                isRainbow = true;
+                break;
+        }
+
+        float timer = 0f;
+        while (timer < 4f)
+        {
+            if (isRainbow)
+            {
+                // cycle through rainbow colors
+                float hue = (Time.time % 1f); // 0 to 1 over 1 second
+                Color rainbowColor = Color.HSVToRGB(hue, 1f, 1f);
+                SetCharacterGlow(member, true, rainbowColor);
+            }
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        // Reset effect
+        ClearEffects(member);
+        activeEffects.Remove(section);
+    }
+
+    private void ClearEffects(GameObject member)
+    {
+        var anim = member.GetComponent<Animator>();
+        if (anim != null) anim.speed = 1f;
+
+        SetCharacterGlow(member, false);
+
+        foreach (Transform child in member.transform)
+        {
+            if (child.name == "FireBurstEffect")
+            {
+                Destroy(child.gameObject);
+            }
+        }
+    }
+
+    private void SetCharacterGlow(GameObject member, bool glow, Color glowColor = default)
+    {
+        Renderer[] renderers = member.GetComponentsInChildren<Renderer>();
+        foreach (var r in renderers)
+        {
+            if (r is ParticleSystemRenderer) continue;
+
+            if (glow)
+            {
+                if (!originalColors.ContainsKey(r))
+                {
+                    if (r.material.HasProperty("_Color"))
+                        originalColors[r] = r.material.color;
+                    else if (r.sharedMaterial != null && r.sharedMaterial.HasProperty("_BaseColor"))
+                        originalColors[r] = r.material.GetColor("_BaseColor");
+                    else
+                        originalColors[r] = Color.white;
+                }
+                
+                if (r.material.HasProperty("_EmissionColor"))
+                {
+                    r.material.EnableKeyword("_EMISSION");
+                    r.material.SetColor("_EmissionColor", glowColor * 2f);
+                }
+                else if (r.material.HasProperty("_Color"))
+                {
+                    r.material.color = glowColor;
+                }
+            }
+            else
+            {
+                if (r.material.HasProperty("_EmissionColor"))
+                {
+                    r.material.DisableKeyword("_EMISSION");
+                    r.material.SetColor("_EmissionColor", Color.black);
+                }
+                
+                if (originalColors.TryGetValue(r, out Color original))
+                {
+                    if (r.material.HasProperty("_Color"))
+                        r.material.color = original;
+                    else if (r.material.HasProperty("_BaseColor"))
+                        r.material.SetColor("_BaseColor", original);
+                }
+            }
+        }
+    }
+
+    private bool isExiting = false;
+
     /// <summary>Reset game state and return to main menu.</summary>
     public void ExitToMainMenu()
     {
+        isExiting = true;
         ClearAllPlacements();
         if (RhythmGameController.Instance != null)
         {
@@ -1184,6 +1272,8 @@ public class OrchestraPlacement : MonoBehaviour
 
     void OnGUI()
     {
+        if (isExiting) return;
+
         InitStyles();
         GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * 3);
         
@@ -1931,9 +2021,9 @@ public class OrchestraPlacement : MonoBehaviour
             for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
             
             // Adjust height offset per section
-            float offset = (section == OrchestraSection.Pipe || section == OrchestraSection.Flute) 
-                ? -0.05f   // Bring target down inside the bounds for Pipe/Flute
-                : 0.05f;   // Keep slightly above head for others (Drum/Xylo)
+            float offset = (section == OrchestraSection.Flute) 
+                ? -0.2f   // Bring target down inside the bounds for Flute
+                : -0.1f;   // Keep slightly above head for others (Drum/Xylo/Pipe)
                 
             return new Vector3(b.center.x, b.max.y + offset, b.center.z);
         }
@@ -1945,46 +2035,67 @@ public class OrchestraPlacement : MonoBehaviour
         var ctrl = RhythmGameController.Instance;
         if (ctrl == null) return;
         
-        float panelW = 220f;
-        float panelH = 340f;
+        bool isTutorial = GameSettings.CurrentMode == GameMode.Tutorial;
+        float panelW = isTutorial ? 260f : 220f;
+        float panelH = isTutorial ? 160f : 340f;
         float centerX = (Screen.width / 3f - panelW) / 2f;
         float centerY = (Screen.height / 3f - panelH) / 2f;
         
         GUILayout.BeginArea(new Rect(centerX, centerY, panelW, panelH), hudBoxStyle);
         
-        GUILayout.Label("🎵 ROUND COMPLETE", headerStyle);
-        GUILayout.Space(10);
-        
-        GUILayout.Label(ctrl.TotalScore.ToString("N0"), scoreStyle);
-        GUILayout.Space(6);
-        
-        GUILayout.Label($"<color=#44FF88>Perfect Score:</color> {ctrl.PerfectScore}", labelStyle);
-        GUILayout.Label($"<color=#FFEE33>Good Score:</color> {ctrl.GoodScore}", labelStyle);
-        GUILayout.Label($"<color=#FF5555>Misses:</color> {ctrl.MissCount}", labelStyle);
-        
-        GUILayout.Space(6);
-        GUILayout.Label($"<color=#88CCFF>Combo Bonus:</color> {ctrl.ComboBonusScore}", labelStyle);
-        GUILayout.Label($"<color=#FF88FF>Tempo Bonus:</color> {ctrl.TempoBonusScore}", labelStyle);
-        GUILayout.Label($"Max Combo: {ctrl.MaxCombo}x", labelStyle);
-        
-        GUILayout.Space(12);
-        
-        if (GUILayout.Button("▶ PLAY AGAIN", buttonStyle, GUILayout.Height(30)))
+        if (isTutorial)
         {
-            ctrl.ReturnToSongSelection();
+            GUILayout.Label("🎉 TUTORIAL COMPLETE", headerStyle);
+            GUILayout.Space(20);
+            
+            GUIStyle centeredLabel = new GUIStyle(labelStyle);
+            centeredLabel.alignment = TextAnchor.MiddleCenter;
+            centeredLabel.fontSize = 12;
+            GUILayout.Label("Now you're ready to play the game!", centeredLabel);
+            
+            GUILayout.Space(30);
+            
+            if (GUILayout.Button("← Return to Main Menu", buttonStyle, GUILayout.Height(35)))
+            {
+                ExitToMainMenu();
+            }
         }
-        
-        GUILayout.Space(4);
-        
-        if (GUILayout.Button("✎ Edit Placement", buttonStyle))
+        else
         {
-            UnlockPlacements();
-        }
+            GUILayout.Label("🎵 ROUND COMPLETE", headerStyle);
+            GUILayout.Space(10);
+            
+            GUILayout.Label(ctrl.TotalScore.ToString("N0"), scoreStyle);
+            GUILayout.Space(6);
+            
+            GUILayout.Label($"<color=#44FF88>Perfect Score:</color> {ctrl.PerfectScore}", labelStyle);
+            GUILayout.Label($"<color=#FFEE33>Good Score:</color> {ctrl.GoodScore}", labelStyle);
+            GUILayout.Label($"<color=#FF5555>Misses:</color> {ctrl.MissCount}", labelStyle);
+            
+            GUILayout.Space(6);
+            GUILayout.Label($"<color=#88CCFF>Combo Bonus:</color> {ctrl.ComboBonusScore}", labelStyle);
+            GUILayout.Label($"<color=#FF88FF>Tempo Bonus:</color> {ctrl.TempoBonusScore}", labelStyle);
+            GUILayout.Label($"Max Combo: {ctrl.MaxCombo}x", labelStyle);
+            
+            GUILayout.Space(12);
+            
+            if (GUILayout.Button("▶ PLAY AGAIN", buttonStyle, GUILayout.Height(30)))
+            {
+                ctrl.ReturnToSongSelection();
+            }
+            
+            GUILayout.Space(4);
+            
+            if (GUILayout.Button("✎ Edit Placement", buttonStyle))
+            {
+                UnlockPlacements();
+            }
 
-        GUILayout.Space(4);
-        if (GUILayout.Button("← Return to Main Menu", buttonStyle))
-        {
-            ExitToMainMenu();
+            GUILayout.Space(4);
+            if (GUILayout.Button("← Return to Main Menu", buttonStyle))
+            {
+                ExitToMainMenu();
+            }
         }
         
         GUILayout.EndArea();

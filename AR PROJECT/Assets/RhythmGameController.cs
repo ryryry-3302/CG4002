@@ -1007,18 +1007,29 @@ namespace OrchestraMaestro
             tutorialExpectedGesture = GestureType.ERROR;
             tutorialExpectedSection = OrchestraSection.Drum;
 
-            string finalMsg = "Great job! You've learned all the gestures and how they influence the orchestra.\n\nNow continue playing the song, use LEFT/RIGHT to navigate, and match the incoming cues!";
+            rhythmMap?.StopPlayback();
+            if (audioSource != null && audioSource.isPlaying)
+            {
+                audioSource.Stop();
+            }
+
+            string finalMsg = "Now you're ready to play the game!";
 
             TutorialDialogController.Instance?.Show(
                 finalMsg,
                 () => {
-                    if (rhythmMap != null)
-                        rhythmMap.ResumeFromTutorial();
-                    if (audioSource != null)
-                        audioSource.UnPause();
+                    var placement = UnityEngine.Object.FindObjectOfType<OrchestraPlacement>();
+                    if (placement != null)
+                    {
+                        placement.ExitToMainMenu();
+                    }
+                    else
+                    {
+                        UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+                    }
                 },
                 null,
-                "Start Song");
+                "Return to Main Menu");
 
             Debug.Log("[RhythmGameController] Guided tutorial gesture training completed");
         }
