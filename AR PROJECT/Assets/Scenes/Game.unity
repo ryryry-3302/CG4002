@@ -564,6 +564,8 @@ MonoBehaviour:
   appStateTopic: orchestra/app_state
   controlTopic: /control/visualizer
   rightCommandTopic: ar/right/cmd
+  leftGestureStartTopic: ar/left/gesture/start
+  leftGestureEndTopic: ar/left/gesture/end
   autoReconnect: 1
   reconnectInterval: 5
   stickBufferDuration: 2
@@ -608,6 +610,7 @@ MonoBehaviour:
   combo10xSfx: {fileID: 8300000, guid: 6c4e93e8a0c8d735c87e0e61ef4228c8, type: 3}
   combo20xSfx: {fileID: 8300000, guid: 09f918cbbe8be5820993214d79184fe3, type: 3}
   ambienceSfx: {fileID: 8300000, guid: fe58bc31d175c5f3b8e509e4ef593178, type: 3}
+  tutorialBgm: {fileID: 0}
   endingSfx: {fileID: 8300000, guid: 09d79f3d17426dfbca945a84bef0bb5a, type: 3}
 --- !u!114 &164925909
 MonoBehaviour:
@@ -622,8 +625,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   perfectWindow: 0.3
-  goodWindow: 0.7
-  missWindow: 1
+  goodWindowLateFallback: 2
+  goodWindowEarlyFallback: 8
   cueLeadTime: 0.3
 --- !u!114 &164925910
 MonoBehaviour:
@@ -2361,6 +2364,10 @@ MonoBehaviour:
   - {fileID: 2452762725993195741, guid: d568dbd2e15af3bfa8ac16384dde8608, type: 3}
   - {fileID: 2699246951506681812, guid: e8c3008f0c604b681bbc389d8f3a86ab, type: 3}
   prefabSections: 
+  wShapeIcon: {fileID: 2800000, guid: c095bb11338e740feba03b509ff0d3ba, type: 3}
+  hourglassIcon: {fileID: 2800000, guid: 49e0418be8b60b6c7988921b8b4f125b, type: 3}
+  lightningIcon: {fileID: 2800000, guid: 62c295da81ec0f8e1aa846511083a5fa, type: 3}
+  tripleCircleIcon: {fileID: 2800000, guid: 0d9060bc6ae98e5a8bd3ce49415880ae, type: 3}
   highlightColor: {r: 1, g: 0.84, b: 0, a: 1}
   perfectColor: {r: 0, g: 1, b: 0.5, a: 1}
   goodColor: {r: 1, g: 1, b: 0, a: 1}
@@ -2786,6 +2793,11 @@ MonoBehaviour:
   inactiveColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.5}
   promptText: {fileID: 0}
   promptBackground: {fileID: 0}
+  promptIcon: {fileID: 0}
+  wShapeSprite: {fileID: 0}
+  hourglassSprite: {fileID: 0}
+  lightningSprite: {fileID: 0}
+  tripleCircleSprite: {fileID: 0}
   promptFadeDuration: 0.3
   judgementText: {fileID: 1421111919}
   judgementDisplayDuration: 0.8

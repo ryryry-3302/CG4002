@@ -216,7 +216,7 @@ public class BatonSparkleEffect : MonoBehaviour
 
         emissionModule.rateOverTime = currentEmissionRate;
 
-        // Update trail color based on combo (10x = red, 20x+ = purple gradient)
+        // Update trail color based on combo (3x = blue, 5x = red, 10x+ = purple gradient)
         int combo = RhythmGameController.Instance?.Combo ?? 0;
         if (combo != lastComboForTrail)
         {
@@ -232,10 +232,12 @@ public class BatonSparkleEffect : MonoBehaviour
 
     private Color GetFlyingSparkleColor(JudgementType judgement, int combo)
     {
-        if (combo >= 20)
-            return new Color(0.9f, 0.45f, 1f);
         if (combo >= 10)
+            return new Color(0.9f, 0.45f, 1f);
+        if (combo >= 5)
             return new Color(1f, 0.3f, 0.25f);
+        if (combo >= 3)
+            return new Color(0.2f, 0.8f, 1f); // New tier for 3x
         return judgement == JudgementType.Perfect
             ? new Color(1f, 0.9f, 0.4f)
             : new Color(1f, 1f, 0.95f);
@@ -246,9 +248,9 @@ public class BatonSparkleEffect : MonoBehaviour
         if (sparkleParticles == null) return;
         var main = sparkleParticles.main;
         var grad = new Gradient();
-        if (combo >= 20)
+        if (combo >= 10)
         {
-            // 20x+: pretty purple gradient (violet -> magenta -> deep purple)
+            // 10x+: pretty purple gradient (violet -> magenta -> deep purple)
             main.startColor = new Color(0.85f, 0.4f, 1f, 0.95f);
             grad.SetKeys(
                 new[] {
@@ -259,15 +261,27 @@ public class BatonSparkleEffect : MonoBehaviour
                 },
                 new[] { new GradientAlphaKey(0.95f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
         }
-        else if (combo >= 10)
+        else if (combo >= 5)
         {
-            // 10x: red
+            // 5x: red
             main.startColor = new Color(1f, 0.25f, 0.2f, 0.95f);
             grad.SetKeys(
                 new[] {
                     new GradientColorKey(new Color(1f, 0.4f, 0.35f), 0f),
                     new GradientColorKey(new Color(1f, 0.2f, 0.15f), 0.5f),
                     new GradientColorKey(new Color(0.8f, 0.1f, 0.1f), 1f)
+                },
+                new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
+        }
+        else if (combo >= 3)
+        {
+            // 3x: blue
+            main.startColor = new Color(0.2f, 0.8f, 1f, 0.95f);
+            grad.SetKeys(
+                new[] {
+                    new GradientColorKey(new Color(0.3f, 0.9f, 1f), 0f),
+                    new GradientColorKey(new Color(0.1f, 0.6f, 1f), 0.5f),
+                    new GradientColorKey(new Color(0.0f, 0.4f, 0.9f), 1f)
                 },
                 new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.5f, 0.6f), new GradientAlphaKey(0f, 1f) });
         }

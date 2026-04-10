@@ -24,6 +24,11 @@ namespace OrchestraMaestro
         [Header("Gesture Prompt")]
         [SerializeField] private TextMeshProUGUI promptText;
         [SerializeField] private Image promptBackground;
+        [SerializeField] private Image promptIcon; // Shows the complex gesture icon
+        [SerializeField] private Sprite wShapeSprite;
+        [SerializeField] private Sprite hourglassSprite;
+        [SerializeField] private Sprite lightningSprite;
+        [SerializeField] private Sprite tripleCircleSprite;
         [SerializeField] private float promptFadeDuration = 0.3f;
         
         [Header("Judgement Feedback")]
@@ -191,12 +196,29 @@ namespace OrchestraMaestro
             string gestureName = FormatGestureName(gesture);
             promptText.text = gestureName;
             
+            if (promptIcon != null)
+            {
+                promptIcon.sprite = GetSpriteForGesture(gesture);
+            }
+            
             if (promptCoroutine != null)
             {
                 StopCoroutine(promptCoroutine);
             }
             
             promptCoroutine = StartCoroutine(PromptAnimation(timeUntilHit));
+        }
+        
+        private Sprite GetSpriteForGesture(GestureType gesture)
+        {
+            return gesture switch
+            {
+                GestureType.W_SHAPE => wShapeSprite,
+                GestureType.HOURGLASS_SHAPE => hourglassSprite,
+                GestureType.LIGHTNING_BOLT_SHAPE => lightningSprite,
+                GestureType.TRIPLE_CLOCKWISE_CIRCLE => tripleCircleSprite,
+                _ => null
+            };
         }
         
         /// <summary>Hide the current prompt</summary>
@@ -210,12 +232,17 @@ namespace OrchestraMaestro
             {
                 promptBackground.gameObject.SetActive(false);
             }
+            if (promptIcon != null)
+            {
+                promptIcon.gameObject.SetActive(false);
+            }
         }
         
         private IEnumerator PromptAnimation(float duration)
         {
             if (promptText != null) promptText.gameObject.SetActive(true);
             if (promptBackground != null) promptBackground.gameObject.SetActive(true);
+            if (promptIcon != null && promptIcon.sprite != null) promptIcon.gameObject.SetActive(true);
             
             // Fade in
             float fadeIn = Mathf.Min(promptFadeDuration, duration * 0.3f);
@@ -260,6 +287,12 @@ namespace OrchestraMaestro
                 Color c = promptBackground.color;
                 c.a = alpha * 0.8f;
                 promptBackground.color = c;
+            }
+            if (promptIcon != null)
+            {
+                Color c = promptIcon.color;
+                c.a = alpha;
+                promptIcon.color = c;
             }
         }
         

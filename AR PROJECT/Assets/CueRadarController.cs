@@ -182,8 +182,8 @@ namespace OrchestraMaestro
             {
                 case GestureType.UP: return "UP";
                 case GestureType.DOWN: return "DN";
-                case GestureType.LEFT: return "LT";
-                case GestureType.RIGHT: return "RT";
+                case GestureType.LEFT: return "LEFT";
+                case GestureType.RIGHT: return "RIGHT";
                 case GestureType.PUNCH: return "HIT";
                 case GestureType.WITHDRAW: return "OUT";
                 case GestureType.W_SHAPE: return "W";

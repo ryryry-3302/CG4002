@@ -21,6 +21,12 @@ public class OrchestraPlacement : MonoBehaviour
     [Tooltip("Which section each prefab belongs to (same order as prefabs)")]
     [SerializeField] private OrchestraSection[] prefabSections;
     
+    [Header("Complex Gesture HUD Icons")]
+    [SerializeField] private Texture2D wShapeIcon;
+    [SerializeField] private Texture2D hourglassIcon;
+    [SerializeField] private Texture2D lightningIcon;
+    [SerializeField] private Texture2D tripleCircleIcon;
+
     [Header("Visual Feedback")]
     [SerializeField] private Color highlightColor = new Color(1f, 0.84f, 0f, 1f); // Gold
     [SerializeField] private Color perfectColor = new Color(0f, 1f, 0.5f, 1f);   // Green
@@ -686,7 +692,30 @@ public class OrchestraPlacement : MonoBehaviour
         CalibrationController.Instance.OnCalibrationComplete += OnCalibrationComplete;
 
         // Start calibration UI
-        CalibrationController.Instance.StartCalibration();
+        if(GameSettings.CurrentMode == GameMode.Tutorial) // Add tutorial dialog before calibration
+        {
+            if (TutorialDialogController.Instance == null)
+            {
+                var go = new GameObject("TutorialDialogController");
+                go.AddComponent<TutorialDialogController>();
+            }
+
+            // Ensure stale tutorial prompts are not queued behind this dialog.
+            TutorialDialogController.Instance?.Clear();
+            tutorialStep = 4; // bypass song-selection tutorial prompt
+
+            var calibClip = Resources.Load<UnityEngine.Video.VideoClip>("GIFS_WEBM/calibration");
+            TutorialDialogController.Instance.Show(
+                "Before we begin, let's calibrate your left glove by touching the base of your thumb to each of your fingers sequentially.\n\nPress 'Start Calibration' when you're ready.",
+                () => CalibrationController.Instance.StartCalibration(),
+                calibClip,
+                "Start Calibration"
+            );
+        }
+        else
+        {
+            CalibrationController.Instance.StartCalibration();
+        }
     }
 
     private void OnCalibrationComplete()
@@ -730,6 +759,7 @@ public class OrchestraPlacement : MonoBehaviour
                 // Hide tutorial step 2 text
                 tutorialStep = 4; // bypass song selection hint
                 
+                ctrl.tutorialTempoTrainingActive = false;
                 ctrl.SelectSongAndStart(tutorialSong);
                 Debug.Log("[OrchestraPlacement] Auto-started tutorial map.");
             }
@@ -1528,6 +1558,11 @@ public class OrchestraPlacement : MonoBehaviour
         
         if (gameState == RhythmGameController.GameState.Setup)
         {
+            if (TutorialDialogController.Instance != null && TutorialDialogController.Instance.IsShowing())
+            {
+                return;
+            }
+
             if (CalibrationController.Instance != null && CalibrationController.Instance.IsCalibrating)
             {
                 return;
@@ -1731,6 +1766,12 @@ public class OrchestraPlacement : MonoBehaviour
         // ── Top-center: gesture prompt (bold, no box) + timing slider ──
         var cueInfo = CueRadarManager.Instance?.GetCurrentActiveGesture() ?? (null, null, Color.white);
         float cueProgress = CueRadarManager.Instance?.GetCurrentCueProgress() ?? -1f;
+        GestureType activeGestureType = GestureType.ERROR;
+
+        if (CueRadarManager.Instance != null && cueInfo.gestureName != null)
+        {
+            CueRadarManager.Instance.TryGetCurrentActiveGestureType(out activeGestureType);
+        }
 
         bool isTutorialDialogVisible = TutorialDialogController.Instance != null && TutorialDialogController.Instance.IsShowing();
 
@@ -1738,6 +1779,7 @@ public class OrchestraPlacement : MonoBehaviour
         {
             cueInfo = (FormatGestureLabel(guidedGesture), guidedSection.ToString(), new Color(1f, 0.9f, 0.5f));
             cueProgress = -1f; // no countdown timer in guided tutorial
+            activeGestureType = guidedGesture;
         }
         
         if (cueInfo.gestureName != null && !isTutorialDialogVisible)
@@ -1748,21 +1790,41 @@ public class OrchestraPlacement : MonoBehaviour
                 DrawGuidedTargetWorldIndicator(activeSection);
             }
 
+            float promptY = 25f; // Added top padding so HUD isn't clipped
             float promptW = 260f;
             float promptX = (sw - promptW) / 2f;
             
             // Gesture name — large bold (doubled from 16 to 32)
             gesturePromptStyle.fontSize = 32;
             gesturePromptStyle.alignment = TextAnchor.MiddleCenter;
-            DrawOutlinedLabel(new Rect(promptX, 0, promptW, 42), cueInfo.gestureName, gesturePromptStyle, cueInfo.timingColor);
+            DrawOutlinedLabel(new Rect(promptX, promptY, promptW, 42), cueInfo.gestureName, gesturePromptStyle, cueInfo.timingColor);
             gesturePromptStyle.fontSize = 13;
             
             // Section name below — also outlined
             int savedSectionSize = sectionLabelStyle.fontSize;
             sectionLabelStyle.fontSize = 14;
-            DrawOutlinedLabel(new Rect(promptX, 40, promptW, 20), $"[{cueInfo.sectionName}]", sectionLabelStyle, cueInfo.timingColor);
+            DrawOutlinedLabel(new Rect(promptX, promptY + 40f, promptW, 20), $"[{cueInfo.sectionName}]", sectionLabelStyle, cueInfo.timingColor);
             sectionLabelStyle.normal.textColor = new Color(0.6f, 0.8f, 1f);
             sectionLabelStyle.fontSize = savedSectionSize;
+
+            float yOffset = promptY + 62f;
+
+            // Gesture Icon
+            Texture2D gestureIcon = GetIconForGesture(activeGestureType);
+            if (gestureIcon != null)
+            {
+                float iconSize = 96f; // 2x bigger
+                // Position to the right of the gesture prompt text block
+                float iconX = promptX + promptW - 30f;
+                float iconY = promptY - 15f; // Vertically center with the text
+                
+                Color oldColor = GUI.color;
+                Color iconColor = cueInfo.timingColor;
+                iconColor.a = 0.9f;
+                GUI.color = iconColor;
+                GUI.DrawTexture(new Rect(iconX, iconY, iconSize, iconSize), gestureIcon);
+                GUI.color = oldColor;
+            }
             
             // Timing slider below the gesture
             if (cueProgress >= 0f)
@@ -1770,7 +1832,7 @@ public class OrchestraPlacement : MonoBehaviour
                 float sliderW = 160f;
                 float sliderH = 8f;
                 float sliderX = (sw - sliderW) / 2f;
-                float sliderY = 62f;
+                float sliderY = yOffset;
                 
                 // Background track
                 GUI.DrawTexture(new Rect(sliderX, sliderY, sliderW, sliderH), texSliderBg);
@@ -1821,16 +1883,31 @@ public class OrchestraPlacement : MonoBehaviour
         // ── Tutorial: paused — perform gesture ──
         if (ctrl != null && ctrl.IsTutorialPaused && !isTutorialDialogVisible)
         {
-            headerStyle.normal.textColor = new Color(1f, 0.9f, 0.5f);
-            GUI.Label(new Rect((sw - 200f) / 2f, sh * 0.25f, 200f, 30f), "Perform the gesture!", headerStyle);
+            string gestureName = !string.IsNullOrEmpty(ctrl.ExpectedTutorialGestureName) ? ctrl.ExpectedTutorialGestureName.ToUpper() : "GESTURE";
+            Color textColor = new Color(1f, 0.9f, 0.5f);
+            DrawOutlinedLabel(new Rect((sw - 300f) / 2f, sh * 0.25f, 300f, 30f), $"Perform {gestureName} gesture!", headerStyle, textColor);
         }
 
         // Tutorial: wrong gesture hint
         string wrongHint = ctrl?.TutorialWrongGestureHint;
         if (!string.IsNullOrEmpty(wrongHint))
         {
-            labelStyle.normal.textColor = new Color(1f, 0.6f, 0.3f);
-            GUI.Label(new Rect((sw - 280f) / 2f, sh * 0.5f, 280f, 50f), wrongHint, labelStyle);
+            int savedSize = labelStyle.fontSize;
+            bool savedWrap = labelStyle.wordWrap;
+            TextAnchor savedAlign = labelStyle.alignment;
+            
+            labelStyle.fontSize = 14;
+            labelStyle.wordWrap = true;
+            labelStyle.alignment = TextAnchor.MiddleCenter;
+            Color hintColor = new Color(1f, 0.6f, 0.3f);
+            
+            float hintW = 340f;
+            float hintH = 100f;
+            DrawOutlinedLabel(new Rect((sw - hintW) / 2f, sh * 0.5f - 20f, hintW, hintH), wrongHint, labelStyle, hintColor);
+            
+            labelStyle.fontSize = savedSize;
+            labelStyle.wordWrap = savedWrap;
+            labelStyle.alignment = savedAlign;
         }
         
         // ── Left-center: Recording Indicator ──
@@ -1877,6 +1954,8 @@ public class OrchestraPlacement : MonoBehaviour
         {
             GestureType.UP => "↑ UP",
             GestureType.DOWN => "↓ DOWN",
+            GestureType.LEFT => "← LEFT",
+            GestureType.RIGHT => "→ RIGHT",
             GestureType.PUNCH => "👊 PUNCH",
             GestureType.WITHDRAW => "👊 WITHDRAW",
             GestureType.W_SHAPE => "W",
@@ -1884,6 +1963,18 @@ public class OrchestraPlacement : MonoBehaviour
             GestureType.LIGHTNING_BOLT_SHAPE => "Lightning Bolt",
             GestureType.TRIPLE_CLOCKWISE_CIRCLE => "Triple Circle",
             _ => gesture.ToString().Replace("_SHAPE", "").Replace("_", " ")
+        };
+    }
+
+    private Texture2D GetIconForGesture(GestureType gesture)
+    {
+        return gesture switch
+        {
+            GestureType.W_SHAPE => wShapeIcon,
+            GestureType.HOURGLASS_SHAPE => hourglassIcon,
+            GestureType.LIGHTNING_BOLT_SHAPE => lightningIcon,
+            GestureType.TRIPLE_CLOCKWISE_CIRCLE => tripleCircleIcon,
+            _ => null
         };
     }
 

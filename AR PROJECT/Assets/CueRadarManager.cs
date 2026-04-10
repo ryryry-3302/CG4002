@@ -59,6 +59,8 @@ namespace OrchestraMaestro
                     {
                         GestureType.UP => "↑ UP",
                         GestureType.DOWN => "↓ DOWN",
+                        GestureType.LEFT => "← LEFT",
+                        GestureType.RIGHT => "→ RIGHT",
                         GestureType.PUNCH => "👊 PUNCH",
                         GestureType.WITHDRAW => "👊 WITHDRAW",
                         GestureType.W_SHAPE => "W",

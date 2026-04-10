@@ -100,6 +100,22 @@ namespace OrchestraMaestro
         public string TutorialWrongGestureHint { get; private set; }
         /// <summary>Tutorial: whether playback is paused waiting for user gesture.</summary>
         public bool IsTutorialPaused => rhythmMap != null && rhythmMap.IsPausedForTutorial;
+        
+        /// <summary>Tutorial: The current gesture name the user needs to perform to unpause the tutorial.</summary>
+        public string ExpectedTutorialGestureName
+        {
+            get
+            {
+                if (tutorialNavigationTrainingActive && tutorialExpectedNavigationGesture != GestureType.ERROR)
+                    return GetTutorialDisplayNameForGesture(tutorialExpectedNavigationGesture);
+                if (tutorialGestureTrainingActive && tutorialExpectedGesture != GestureType.ERROR)
+                    return GetTutorialDisplayNameForGesture(tutorialExpectedGesture);
+                if (tutorialWaitingCue.HasValue)
+                    return GetTutorialDisplayNameForGesture(tutorialWaitingCue.Value.gestureType);
+                return null;
+            }
+        }
+        
         public bool IsGuidedTutorialActive => tutorialNavigationTrainingActive || tutorialGestureTrainingActive;
         public bool IsTutorialMode => GameSettings.CurrentMode == GameMode.Tutorial;
         public bool TutorialGestureTrainingActive => tutorialGestureTrainingActive;
@@ -130,6 +146,7 @@ namespace OrchestraMaestro
         private bool tutorialRightNavigationCompleted;
         private GestureType tutorialExpectedNavigationGesture = GestureType.ERROR;
         private bool tutorialGestureTrainingActive;
+        public bool tutorialTempoTrainingActive;
         private bool tutorialWaitingForTryItOutInput;
         private int tutorialGestureTrainingIndex;
         private GestureType tutorialExpectedGesture = GestureType.ERROR;
@@ -243,6 +260,14 @@ namespace OrchestraMaestro
                 {
                     StopBpmPreview();
                 }
+            }
+
+            if (currentState == GameState.Playing && tutorialTempoTrainingActive && TempoSectionEnd > 0f && CurrentSongTime >= TempoSectionEnd)
+            {
+                tutorialTempoTrainingActive = false;
+                Debug.Log("[RhythmGameController] Tempo training section ended");
+                EndGame();
+                return;
             }
 
             // Ending SFX: play once when entering last 10 seconds
@@ -361,14 +386,23 @@ namespace OrchestraMaestro
 
             if (GameSettings.CurrentMode == GameMode.Tutorial)
             {
-                // In tutorial mode, play special BGM and skip audience ambience
-                if (tutorialBgm != null && audioSource != null)
+                if (!tutorialTempoTrainingActive)
                 {
-                    audioSource.clip = tutorialBgm;
-                    audioSource.loop = true;
-                    audioSource.Play();
+                    // In tutorial mode, play special BGM and skip audience ambience
+                    if (tutorialBgm != null && audioSource != null)
+                    {
+                        audioSource.clip = tutorialBgm;
+                        audioSource.loop = true;
+                        audioSource.Play();
+                    }
+                    BeginTutorialNavigationTraining();
                 }
-                BeginTutorialNavigationTraining();
+                else
+                {
+                    // We are in tempo training mode, don't restart gesture training.
+                    // Start the tempo training dialog.
+                    BeginTutorialTempoTraining();
+                }
             }
             else
             {
@@ -716,9 +750,9 @@ namespace OrchestraMaestro
 
             AudioClip clip = combo switch
             {
-                5 => combo5xSfx,
-                10 => combo10xSfx,
-                20 => combo20xSfx,
+                3 => combo5xSfx,
+                5 => combo10xSfx,
+                10 => combo20xSfx,
                 _ => null
             };
             if (clip != null && Camera.main != null)
@@ -1013,25 +1047,91 @@ namespace OrchestraMaestro
                 audioSource.Stop();
             }
 
-            string finalMsg = "Now you're ready to play the game!";
+            string finalMsg = "You've successfully mastered the gestures!\nNow let's move on to tempo keeping.";
 
             TutorialDialogController.Instance?.Show(
                 finalMsg,
                 () => {
-                    var placement = UnityEngine.Object.FindObjectOfType<OrchestraPlacement>();
-                    if (placement != null)
+                    tutorialTempoTrainingActive = true;
+                    // Find Ode To Joy in available songs
+                    SongData tempoSong = null;
+                    if (availableSongs != null)
                     {
-                        placement.ExitToMainMenu();
+                        foreach (var song in availableSongs)
+                        {
+                            if (song != null && (song.name.Contains("Ode") || (song.songName != null && song.songName.Contains("Ode"))))
+                            {
+                                tempoSong = song;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (tempoSong != null)
+                    {
+                        SelectSongAndStart(tempoSong);
                     }
                     else
                     {
-                        UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+                        Debug.LogWarning("[RhythmGameController] OdeToJoy song not found. Exiting to main menu.");
+                        var placement = UnityEngine.Object.FindObjectOfType<OrchestraPlacement>();
+                        if (placement != null)
+                        {
+                            placement.ExitToMainMenu();
+                        }
+                        else
+                        {
+                            UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+                        }
                     }
                 },
                 null,
-                "Return to Main Menu");
+                "Start Tempo Training");
 
             Debug.Log("[RhythmGameController] Guided tutorial gesture training completed");
+        }
+
+        private void BeginTutorialTempoTraining()
+        {
+            var tempoClip = UnityEngine.Resources.Load<UnityEngine.Video.VideoClip>("GIFS_WEBM/Tempo");
+            if (tempoClip == null)
+            {
+                tempoClip = UnityEngine.Resources.Load<UnityEngine.Video.VideoClip>("GIFS/Tempo");
+            }
+            
+            // Pause map to show dialog
+            if (rhythmMap != null) rhythmMap.PauseForTutorial(rhythmMap.CurrentSongTime);
+            if (audioSource != null && audioSource.isPlaying) audioSource.Pause();
+            
+            if (TutorialDialogController.Instance == null)
+            {
+                var go = new GameObject("TutorialDialogController");
+                go.AddComponent<TutorialDialogController>();
+            }
+
+            TutorialDialogController.Instance?.Show(
+                "Tempo Training\n\nKeep the tempo by swinging your baton steadily UP and DOWN exactly on the beats.",
+                () => {
+                    float tempoStart = TempoSectionStart;
+                    float seekTime = tempoStart > 0f ? Mathf.Max(0f, tempoStart - 5f) : 0f;
+
+                    if (rhythmMap != null)
+                    {
+                        rhythmMap.SeekTo(seekTime);
+                    }
+
+                    if (audioSource != null && audioSource.clip != null)
+                    {
+                        audioSource.time = Mathf.Clamp(seekTime, 0f, audioSource.clip.length);
+                    }
+
+                    // Resume playback
+                    if (rhythmMap != null) rhythmMap.ResumeFromTutorial();
+                    if (audioSource != null) audioSource.Play();
+                },
+                tempoClip,
+                "Start Tempo Training"
+            );
         }
 
         private UnityEngine.Video.VideoClip LoadTutorialClipForGesture(GestureType gesture)
@@ -1156,6 +1256,7 @@ namespace OrchestraMaestro
         /// <summary>True if the song has no cue in the first 20s and we're still in that window (skip button can show).</summary>
         public bool CanSkipToFirstCue =>
             currentState == GameState.Playing
+            && !tutorialTempoTrainingActive
             && rhythmMap != null
             && rhythmMap.FirstCueTimestamp >= 20f
             && rhythmMap.CurrentSongTime < 20f;
@@ -1234,7 +1335,11 @@ namespace OrchestraMaestro
                 PlayComboMilestoneSfx(combo);
 
             // Calculate score with combo multiplier
-            int comboMultiplier = Mathf.Min(1 + combo / 10, 4); // Max 4x multiplier
+            int comboMultiplier = 1;
+            if (combo >= 10) comboMultiplier = 4;
+            else if (combo >= 5) comboMultiplier = 3;
+            else if (combo >= 3) comboMultiplier = 2;
+
             int scoreGained = result.scoreAwarded * comboMultiplier;
 
             // Optional: calculate a specific timing score breakdown based on accuracy if not missed
