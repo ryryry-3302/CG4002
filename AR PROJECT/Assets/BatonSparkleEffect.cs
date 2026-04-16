@@ -172,7 +172,7 @@ public class BatonSparkleEffect : MonoBehaviour
         else
         {
             hasLastPosition = false;
-            currentEmissionRate = Mathf.MoveTowards(currentEmissionRate, 0f, fadeOutSpeed * Time.deltaTime);
+            currentEmissionRate = 0f; // Stop emitting immediately when tracking is lost
         }
 
         int combo = RhythmGameController.Instance?.Combo ?? 0;
